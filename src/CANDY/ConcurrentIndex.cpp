@@ -17,6 +17,7 @@ bool CANDY::ConcurrentIndex::setConfig(INTELLI::ConfigMapPtr cfg) {
   IndexTable it;
   myIndexAlgo = it.getIndex(concurrentlAlgoTag);
   if (myIndexAlgo == nullptr) {
+    throw std::runtime_error("Index algorithm not found: " + concurrentlAlgoTag);
     return false;
   }
 

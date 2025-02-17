@@ -81,7 +81,7 @@ bool CANDY::AbstractIndex::loadInitialTensorWithIds(std::vector<faiss::idx_t> id
   return loadInitialTensor(t);
 }
 
-bool CANDY::AbstractIndex::ccInsertAndSearchTensor(torch::Tensor &t, torch::Tensor &qt, int64_t k, std::string &outputFile) {
+bool CANDY::AbstractIndex::ccInsertAndSearchTensor(torch::Tensor &t, torch::Tensor &qt, int64_t k) {
   return false; 
 }
 

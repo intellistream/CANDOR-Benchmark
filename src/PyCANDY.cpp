@@ -300,6 +300,7 @@ PYBIND11_MODULE(PyCANDYAlgo, m) {
       .def("startHPC", &AbstractIndex::startHPC)
       .def("insertTensor", &AbstractIndex::insertTensor)
       .def("ccInsertAndSearchTensor", &AbstractIndex::ccInsertAndSearchTensor)
+      .def("ccSaveResultAsFile", &AbstractIndex::ccSaveResultAsFile)
       .def("insertTensorWithIds", &AbstractIndex::insertTensorWithIds)
       .def("loadInitialTensor", &AbstractIndex::loadInitialTensor)
       .def("loadInitialTensorWithIds", &AbstractIndex::loadInitialTensorWithIds)

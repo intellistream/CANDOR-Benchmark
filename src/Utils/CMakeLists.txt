@@ -3,6 +3,7 @@ add_sources(
         UtilityFunctions.cpp
         MemTracker.cpp
         IntelliTimeStampGenerator.cpp
+        ThreadPool.cpp
 )
 add_subdirectory(Meters)
 add_subdirectory(ComputeGT)

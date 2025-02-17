@@ -1,3 +1,10 @@
+/*
+ *  Copyright (C) 2024 by the INTELLI team
+ *  Created by: Junyao Dong
+ *  Created on: 2025/02/10
+ *  Description:
+ */
+
 #ifndef CANDY_INCLUDE_CANDY_CONCURRENTINDEX_H_
 #define CANDY_INCLUDE_CANDY_CONCURRENTINDEX_H_
 
@@ -15,22 +22,6 @@ using SearchResults = std::vector<torch::Tensor>;
 using SearchRecord = std::tuple<BatchIndex, QueryIndex, SearchResults>;
 
 namespace CANDY {
-
-class ThreadlPool {
- public:
-  ThreadPool(size_t numThreads);
-
-  ~ThreadPool();
-
-  void enqueueTask(std::function<void> task);
-
- private:
-  std::vector<std::thread> workers;
-  std::queue<std::function<void()>> tasks;
-  std::mutex queueMutex;
-  std::condition_variable condition;
-  bool stop = false;
-};
 
 class ConcurrentIndex : public CANDY::AbstractIndex {
  protected:

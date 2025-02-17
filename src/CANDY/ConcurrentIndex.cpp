@@ -11,6 +11,40 @@
 #include <chrono>
 #include <assert.h>
 
+CANDY::ThreadPool::ThreadPool(size_t numThreads) {
+  for (size_t i = 0; i < numThreads; i++) {
+    workers.emplace_back([this] {
+      while (true) {
+        std::unique_lock<std::mutex> lock(this->queueMutex);
+        this->condition.wait(lock, [this] { 
+          return this->stop || !this->tasks.empty(); 
+        });
+        if (this->stop && this->tasks.empty()) return;
+        task = std::move(this->tasks.front());
+        this->tasks.pop();
+      }
+      task();
+    });
+  }
+}
+
+CANDY::ThreadlPool::~ThreadPool() {
+  {
+    std::unique_lock<std::mutex> lock(queueMutex);
+    stop = true;
+  }
+  condition.notify_all();
+  for (std::thread &worker : workers) worker.join();
+}
+
+void CANDY::ThreadlPool::enqueueTask(std::function<void> task) {
+  {
+    std::unqiue_lock<std::mutex> lock(queueMutex);
+    stop = true;
+  }
+  condition.notify_one();
+}
+
 bool CANDY::ConcurrentIndex::setConfig(INTELLI::ConfigMapPtr cfg) {
   assert(cfg);
   std::string concurrentlAlgoTag = cfg->tryString("concurrentAlgoTag", "flat", true);
@@ -47,41 +81,33 @@ bool CANDY::ConcurrentIndex::ccInsertAndSearchTensor(torch::Tensor &t, torch::Te
   size_t writeTotal = t.size(0);
   size_t searchTotal = qt.size(0);
   std::exception_ptr lastException = nullptr;
-  std::mutex lastExceptMutex;
-  std::mutex resultMutex;
+  std::mutex lastExceptMutex, resultMutex;
 
+  ThreadPool pool(numThreads);
+
+  size_t step = 0;
   while (commitedOps < writeTotal) {
     size_t insertCnt = std::min(batchSize, static_cast<int64_t>(writeTotal - commitedOps.load()));
     size_t searchCnt = insertCnt / writeRatio;  
-
-    std::atomic<size_t> currentInsert(0);
-    std::vector<std::thread> writeThreads;
     
-    for (size_t i = 0; i < numThreads; i++) {
-      writeThreads.emplace_back([&, i] {
-        while (true) {
-          size_t idx = currentInsert.fetch_add(1);
-          if (idx >= insertCnt) break;
-          size_t gIdx = commitedOps.fetch_add(1);
-          if (gIdx >= writeTotal) break;
-          try {
-            auto in = t[gIdx];
-            myIndexAlgo->insertTensor(in);  
-          } catch (...) {
-            std::unique_lock<std::mutex> lock(lastExceptMutex);
-            lastException = std::current_exception();
-          }
+    for (size_t i = 0; i < insertCnt; i++) {
+      pool.enqueueTask([&, i, step] {
+        try {
+          auto in = t[commitedOps.fetch_add(1)];
+          myIndexAlgo->insertTensor(in);
+        } catch (...) {
+          std::unique_lock<std::mutex> lock(lastException);
+          lastException = std::current_exception();
         }
       });
     }
 
     std::atomic<size_t> currentSearch(0);
     std::vector<std::thread> readThreads;
-    std::vector<std::vector<SearchRecord>> localRes(numThreads);
 
-    for (size_t i = 0; i < numThreads; i++) {
-      readThreads.emplace_back([&, i] {
-        std::vector<SearchRecord> threadRes;
+    for (size_t i = 0; i < searchCnt; i++) {
+      pool.enqueueTask([&, i, step] {
+        thread_local std::vector<SearchRecord> localSearchBuffer;
         while (true) {
           size_t idx = currentSearch.fetch_add(1);
           if (idx >= searchCnt) break;
@@ -89,33 +115,24 @@ bool CANDY::ConcurrentIndex::ccInsertAndSearchTensor(torch::Tensor &t, torch::Te
           try {
             auto q = qt[queryIdx];
             auto res = myIndexAlgo->searchTensor(q, k);
-            threadRes.emplace_back(commitedOps.load(), queryIdx, res);
+            localSearchBuffer.emplace_back(commitedOps.load(), queryIdx, res);
           } catch (...) {
             std::unique_lock<std::mutex> lock(lastExceptMutex);
             lastException = std::current_exception();
           }
         }
-        localRes[i] = std::move(threadRes);
-      });
+        std::unique_lock<std::mutex> lock(resultMutex);
+        searchRes.insert(searchRes.end(), localSearchBuffer.begin(), localSearchBuffer.end());
+      })
     }
-
-    for (auto &t : writeThreads) {
-      t.join();
-    }
-    writeThreads.clear();  
-
-    for (auto &t : readThreads) {
-      t.join();
-    }
-    readThreads.clear();  
-
-    {
-      std::unique_lock<std::mutex> lock(resultMutex);
-      for (const auto& res : localRes) {
-        searchRes.insert(searchRes.end(), res.begin(), res.end());
-      }
-    }
+    ++step;
   }
+
+  pool.enqueueTask([&] {
+    std::unique_lock<std::mutex> lock(resultMutex);
+    searchRes.insert(searchRes.end(), localSearchBuffer.begin(), localSearchBuffer.end());
+    localSearchBuffer.clear();
+  });
 
   if (lastException) {
     std::rethrow_exception(lastException);

@@ -192,6 +192,7 @@ bool CANDY::FaissIndex::insertTensor(torch::Tensor &t) {
     //return INTELLI::IntelliTensorOP::appendRowsBufferMode(&dbTensor, &t, &lastNNZ, expandStep);
     return true;
   } else {
+    std::cout << "insert ...... " << std::endl;
     index->add(n, new_data);
     //should be unneeded
 //INTELLI::IntelliTensorOP::appendRowsBufferMode(&dbTensor, &t, &lastNNZ, expandStep);

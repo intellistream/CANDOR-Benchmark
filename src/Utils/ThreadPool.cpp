@@ -41,9 +41,14 @@ INTELLI::ThreadPool::~ThreadPool() {
 void INTELLI::ThreadPool::enqueueTask(std::function<void()> task) {
   {
     std::unique_lock<std::mutex> lock(queueMutex);
-    stop = true;
+    if (stop) throw std::runtime_error("ThreadPool has been stopped.");
+    tasks.push(std::move(task));
   }
   condition.notify_one();
+}
+
+void INTELLI::ThreadPool::waitForTasks() {
+  for (std::thread &worker : workers) worker.join();
 }
 
 }

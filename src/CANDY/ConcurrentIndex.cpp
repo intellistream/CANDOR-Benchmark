@@ -44,24 +44,23 @@ bool CANDY::ConcurrentIndex::ccInsertAndSearchTensor(torch::Tensor &t, torch::Te
     return false;
   }
 
-  std::atomic<size_t> commitedOps(0); 
+  std::atomic<size_t> insertOps(0); 
+  std::atomic<size_t> searchOps(0); 
+
   size_t writeTotal = t.size(0);
   size_t searchTotal = qt.size(0);
   std::exception_ptr lastException = nullptr;
-  std::mutex lastExceptMutex, resultMutex;
+  std::mutex lastExceptMutex, resultMutex, bufferMutex;
 
   INTELLI::ThreadPool pool(numThreads);
-  thread_local std::vector<SearchRecord> localSearchBuffer;
+  std::vector<SearchRecord> globalSearchBuffer;
 
-  size_t step = 0;
-  while (commitedOps < writeTotal) {
-    size_t insertCnt = std::min(batchSize, static_cast<int64_t>(writeTotal - commitedOps.load()));
-    size_t searchCnt = insertCnt / writeRatio;  
-    
-    for (size_t i = 0; i < insertCnt; i++) {
-      pool.enqueueTask([&, i, step] {
+  while (insertOps < writeTotal || searchOps < searchTotal) {
+    if (insertOps < writeTotal) {
+      pool.enqueueTask([&, idx = insertOps.fetch_add(1)] {
         try {
-          auto in = t[commitedOps.fetch_add(1)];
+          auto in = t[idx];
+          std::cout << "tensor size " << in.size(0) << std::endl;
           myIndexAlgo->insertTensor(in);
         } catch (...) {
           std::unique_lock<std::mutex> lock(lastExceptMutex);
@@ -70,27 +69,28 @@ bool CANDY::ConcurrentIndex::ccInsertAndSearchTensor(torch::Tensor &t, torch::Te
       });
     }
 
-    for (size_t i = 0; i < searchCnt; i++) {
-      pool.enqueueTask([&, i, step] {
+    if (searchOps < searchTotal) {
+      pool.enqueueTask([&, idx = searchOps.fetch_add(1)] {
         try {
-          size_t queryIdx = randomMode ? (std::rand() % searchTotal) : (i % searchTotal);
+          size_t queryIdx = randomMode ? (std::rand() % searchTotal) : idx;
           auto q = qt[queryIdx];
           auto res = myIndexAlgo->searchTensor(q, k);
-          localSearchBuffer.emplace_back(step, queryIdx, res);  
+          std::unique_lock<std::mutex> lock(bufferMutex);
+          globalSearchBuffer.emplace_back(queryIdx, queryIdx, res);
         } catch (...) {
           std::unique_lock<std::mutex> lock(lastExceptMutex);
           lastException = std::current_exception();
         }
       });
     }
-    ++step;
   }
 
-  pool.enqueueTask([&] {
+  pool.waitForTasks();
+
+  {
     std::unique_lock<std::mutex> lock(resultMutex);
-    searchRes.insert(searchRes.end(), localSearchBuffer.begin(), localSearchBuffer.end());
-    localSearchBuffer.clear();
-  });
+    searchRes.insert(searchRes.end(), globalSearchBuffer.begin(), globalSearchBuffer.end());
+  }
 
   if (lastException) {
     std::rethrow_exception(lastException);

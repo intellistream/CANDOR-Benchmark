@@ -9,8 +9,6 @@ include_directories(${Python3_INCLUDE_DIRS})
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 
-
-
 include_directories (${gflags_INCLUDE_DIR})
 set(CMAKE_VERBOSE_MAKEFILE OFF)
 set(CMAKE_RULE_MESSAGES OFF)
@@ -18,14 +16,6 @@ set(CMAKE_RULE_MESSAGES OFF)
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake;${CMAKE_MODULE_PATH}")
 include(cmake/macros.cmake)
 include(cmake/default.cmake)
-
-# C++ Standard
-#set(CMAKE_CXX_STANDARD 20)
-#set(CMAKE_CXX_STANDARD_REQUIRED ON)
-#gcc 10 g++10
-# First compile faiss before anything else
-#set(CMAKE_CXX_FLAGS "-fno-openmp")
-#test avx2
 
 add_subdirectory(thirdparty/faiss)
 
@@ -268,7 +258,7 @@ else ()
 #
     set(LIBRARIES ${LIBRARIES} glog)
 
-
+    
 
     add_subdirectory(thirdparty/puck)
 
@@ -282,6 +272,10 @@ configure_file(
         "${PROJECT_SOURCE_DIR}/include/puck_config.h.in"
         "${PROJECT_BINARY_DIR}/include/puck_config.h"
 )
+
+add_subdirectory(thirdparty/hnswlib)
+include_directories(thirdparty/hnswlib/hnswlib)
+set(LIBRARIES ${LIBRARIES}  hnswlib)
 
 # Reset output directories for the rest of your project
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)

@@ -114,6 +114,8 @@ struct NegativeDistanceComputer : DistanceComputer {
     }
 };
 
+
+
 DistanceComputer* storage_distance_computer(const Index* storage) {
     if (is_similarity_metric(storage->metric_type)) {
         return new NegativeDistanceComputer(storage->get_distance_computer());
@@ -121,6 +123,9 @@ DistanceComputer* storage_distance_computer(const Index* storage) {
         return storage->get_distance_computer();
     }
 }
+
+
+
 
 void hnsw_add_vertices(
         IndexHNSW& index_hnsw,

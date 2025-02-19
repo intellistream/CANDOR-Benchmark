@@ -25,8 +25,11 @@ namespace faiss {
 struct DistanceComputer {
     /// called before computing distances. Pointer x should remain valid
     /// while operator () is called
+    bool is_search = false;
     virtual void set_query(const float* x) = 0;
-
+    void begin_search(){
+        is_search = true;
+    }
     /// compute distance of vector i to current query
     virtual float operator()(idx_t i) = 0;
 

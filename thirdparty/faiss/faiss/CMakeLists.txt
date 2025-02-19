@@ -22,6 +22,7 @@ set(FAISS_SRC
   IndexHNSW.cpp
   IndexNSW.cpp
   IndexMNRU.cpp
+  IndexLVQHNSW.cpp
   IndexIDMap.cpp
   IndexIVF.cpp
   IndexIVFAdditiveQuantizer.cpp
@@ -119,6 +120,7 @@ set(FAISS_HEADERS
   IndexHNSW.h
   IndexNSW.h
   IndexMNRU.h
+  IndexLVQHNSW.h
   IndexVanama.h
   IndexIDMap.h
   IndexIVF.h

@@ -54,6 +54,8 @@ int sgemm_(
         FINTEGER* ldc);
 }
 
+
+
 namespace faiss {
 
     using MinimaxHeap = HNSW::MinimaxHeap;
@@ -70,21 +72,44 @@ namespace faiss {
 
 /* Wrap the distance computer into one that negates the
    distances. This makes supporting INNER_PRODUCE search easier */
-
+        float lvq_first_level(const float* x, uint8_t* new_codes, const std::vector<float> mean_, const int d);
 struct NegativeDistanceComputer : DistanceComputer {
             /// owned by this
             DistanceComputer* basedis;
+            //std::vector<uint8_t> lvq_codes;
+            const uint8_t* lvq_codes;
+            int d;
+            std::vector<float> mean_;
+
+
+        float int8vec_IP(const uint8_t *x, const uint8_t *y, size_t d) {
+            int32_t product = 0;
+            for (size_t i = 0; i < d; i++) {
+                product += (int32_t)(x[i] * y[i]);
+            }
+            return (float)(product);
+        }
+
+
+            std::vector<uint8_t> q;
 
             explicit NegativeDistanceComputer(DistanceComputer* basedis)
                     : basedis(basedis) {}
 
             void set_query(const float* x) override {
                 basedis->set_query(x);
+                if(is_search){
+                    q.resize(d);
+                    lvq_first_level(x, q.data(), mean_, d);
+                }
             }
 
             /// compute distance of vector i to current query
             float operator()(idx_t i) override {
-                return -(*basedis)(i);
+                if(is_search){
+                    return -int8vec_IP(lvq_codes+i*d, q.data(),d);
+                } else
+                    return -(*basedis)(i);
             }
 
             void distances_batch_4(
@@ -96,8 +121,16 @@ struct NegativeDistanceComputer : DistanceComputer {
                     float& dis1,
                     float& dis2,
                     float& dis3) override {
-                basedis->distances_batch_4(
-                        idx0, idx1, idx2, idx3, dis0, dis1, dis2, dis3);
+                if(is_search){
+
+                    dis0 = int8vec_IP(lvq_codes+idx0*d, q.data(),d);
+                    dis1 = int8vec_IP(lvq_codes+idx1*d, q.data(),d);
+                    dis2 = int8vec_IP(lvq_codes+idx2*d, q.data(),d);
+                    dis3 = int8vec_IP(lvq_codes+idx3*d, q.data(),d);
+                } else {
+                    basedis->distances_batch_4(
+                            idx0, idx1, idx2, idx3, dis0, dis1, dis2, dis3);
+                }
                 dis0 = -dis0;
                 dis1 = -dis1;
                 dis2 = -dis2;
@@ -106,7 +139,10 @@ struct NegativeDistanceComputer : DistanceComputer {
 
             /// compute distance between two stored vectors
             float symmetric_dis(idx_t i, idx_t j) override {
-                return -basedis->symmetric_dis(i, j);
+                if(is_search){
+                    return -int8vec_IP(lvq_codes+i*d,lvq_codes+j*d, d);
+                } else
+                    return -basedis->symmetric_dis(i, j);
             }
 
             virtual ~NegativeDistanceComputer() {
@@ -116,15 +152,12 @@ struct NegativeDistanceComputer : DistanceComputer {
 
 
 
-        DistanceComputer* storage_distance_computer(const Index* storage) {
-            if (is_similarity_metric(storage->metric_type)) {
-                return new NegativeDistanceComputer(storage->get_distance_computer());
-            } else {
-                return storage->get_distance_computer();
-            }
+        NegativeDistanceComputer* storage_distance_computer(const Index* storage) {
+                auto new_dc = new NegativeDistanceComputer(storage->get_distance_computer());
+                return new_dc;
         }
 
-        float lvq_first_level(const float* x, uint8_t* new_codes, const std::vector<float> mean_, const int d);
+
         float lvq_first_level(const float* x, uint8_t* new_codes, const std::vector<float> mean_, const int d) {
             size_t min_index =0;
             size_t max_index =0;
@@ -147,7 +180,7 @@ struct NegativeDistanceComputer : DistanceComputer {
             float delta = (u-l)/(pow(2.0, 8)-1);
             for(size_t i=0; i<d; i++){
                 float temp = (delta * (std::floor((x[i]-(mean_)[i]-l)/delta)+0.5) +l);
-                new_codes[i] = (char)(0xff*temp);
+                new_codes[i] = (int)(0xff*temp);
             }
             return delta;
 
@@ -250,7 +283,7 @@ struct NegativeDistanceComputer : DistanceComputer {
                         // here we should do schedule(dynamic) but this segfaults for
                         // some versions of LLVM. The performance impact should not be
                         // too large when (i1 - i0) / num_threads >> 1
-//#pragma omp for schedule(static)
+#pragma omp for schedule(static)
                         for (int i = i0; i < i1; i++) {
                             storage_idx_t pt_id = order[i];
                             dis->set_query(x + (pt_id - n0) * d);
@@ -353,19 +386,24 @@ struct NegativeDistanceComputer : DistanceComputer {
         for (idx_t i0 = 0; i0 < n; i0 += check_period) {
             idx_t i1 = std::min(i0 + check_period, n);
 
-#pragma omp parallel
+//#pragma omp parallel
             {
                 VisitedTable vt(ntotal);
 
-                std::unique_ptr<DistanceComputer> dis(
+                std::unique_ptr<NegativeDistanceComputer> dis(
                         storage_distance_computer(storage));
 
-#pragma omp for reduction(+ : n1, n2, n3, ndis, nreorder) schedule(guided)
+//#pragma omp for reduction(+ : n1, n2, n3, ndis, nreorder) schedule(guided)
                 for (idx_t i = i0; i < i1; i++) {
                     idx_t* idxi = labels + i * k;
                     float* simi = distances + i * k;
-                    dis->set_query(x + i * d);
                     dis->begin_search();
+
+
+                    dis->lvq_codes = lvqcodes.data();
+                    dis->mean_ = mean_;
+                    dis->d = d;
+                    dis->set_query(x + i * d);
 
 
                     maxheap_heapify(k, simi, idxi);
@@ -416,8 +454,24 @@ struct NegativeDistanceComputer : DistanceComputer {
         int max_level = LVQHNSW.prepare_level_tab(n, false);
         storage->add(n, x);
 
+        for(int i=0; i<n; i++) {
+            auto new_data = x+d*i;
+            ntotal++;
+            for (int j = 0; j < d; j++) {
+                auto div = (new_data[j] - mean_[j]) / ntotal;
+                mean_[j] += div;
+            }
+        }
+        // lvq encoding
+        lvqcodes.resize(ntotal*d);
+        for(int i=n0;i<ntotal; i++){
+            lvq_first_level(x+i*d, lvqcodes.data()+i*d, mean_, d);
+        }
 
-        ntotal = storage->ntotal;
+
+        LVQHNSW.mean_ = &mean_;
+
+
 
         LVQHNSW_add_vertices(*this, n0, n, x, verbose, LVQHNSW.levels.size() == ntotal,max_level);
         printf("adding %ld vectors finishes\n", n);
@@ -927,10 +981,11 @@ struct NegativeDistanceComputer : DistanceComputer {
 
     IndexLVQHNSWFlat::IndexLVQHNSWFlat(int d, int M, MetricType metric)
             : IndexLVQHNSW(
-           new IndexLVQCodes(d, metric),
+            (metric == METRIC_L2) ? new IndexFlatL2(d)
+                                  : new IndexFlat(d, metric),
             M) {
-        d=d;
         own_fields = true;
+        mean_.resize(d,0);
         is_trained = true;
     }
 
@@ -1182,243 +1237,7 @@ struct NegativeDistanceComputer : DistanceComputer {
         storage = index_ivfpq;
         delete storage2l;
     }
-    struct LVQDisL2 : FlatCodesDistanceComputer {
-        size_t d;
-        idx_t nb;
-        const float* q_origin;
-        uint8_t* q;
-        const uint8_t* b;
-        std::vector<float> mean;
-        size_t ndis;
-        Index* real_vectors;
-        float int8vec_IP(uint8_t *x, const uint8_t *y, size_t d) {
-            int32_t product = 0;
-            for (size_t i = 0; i < d; i++) {
-                product += (int32_t)(x[i] * y[i]);
-            }
-            return (float)(product);
-        }
 
-        float int8vec_L2(const uint8_t *x, const uint8_t *y, size_t d) {
-            int32_t sum = 0;
-            for (size_t i = 0; i < d; i++) {
-                sum += (int32_t)((x[i] - y[i]) * (x[i] - y[i]));
-            }
-            return (float)(sum);
-        }
-
-        float operator()(idx_t i) override {
-            if(is_search) {
-                return distance_to_code(codes + i * code_size);
-            } else{
-                auto y2 = new float[d];
-                real_vectors->reconstruct(i, y2);
-                return fvec_L2sqr(q_origin,y2,d);
-            }
-        }
-
-        float distance_to_code(const uint8_t* code) final {
-            ndis++;
-            return int8vec_L2(q, code, d);
-        }
-
-        float symmetric_dis(idx_t i, idx_t j) override {
-            if(is_search)
-                return int8vec_L2(b + j * d, b + i * d, d);
-            else {
-                float *v1 = new float[d];
-                float *v2 = new float[d];
-                real_vectors->reconstruct(i, v1);
-                real_vectors->reconstruct(j, v2);
-                return fvec_L2sqr(v1, v2, d);
-            }
-        }
-
-
-        explicit LVQDisL2(IndexLVQCodes storage, const float* q = nullptr)
-                : FlatCodesDistanceComputer(
-                storage.codes.data(),
-                storage.code_size),
-                  d(storage.d),
-                  nb(storage.ntotal),
-                  q_origin(q),
-                  b(storage.codes.data()),
-                  ndis(0) ,
-                  real_vectors(storage.storage)
-                  {
-            mean = storage.mean_;
-        }
-
-        void set_query(const float* x) override {
-            q_origin = x;
-            q = new uint8_t[d];
-            size_t min_index =0;
-            size_t max_index =0;
-            float min = x[min_index] - (mean)[min_index];
-            float max = x[max_index] - (mean)[max_index];
-
-            for(size_t i=1; i<d; i++){
-                if(x[i]-(mean)[i]<min){
-                    min_index = i;
-                    min = x[i] - (mean)[i];
-                } else if(x[i] - (mean)[i]>max){
-                    max_index = i;
-                    max = x[i] - (mean)[i];
-                }
-            }
-
-            float u = max;
-            float l = min;
-
-            float delta = (u-l)/(pow(2.0, 8)-1);
-            for(size_t i=0; i<d; i++){
-                float temp = (delta * (std::floor((x[i]-(mean)[i]-l)/delta)+0.5) +l);
-                q[i] = (char)(0xff*temp);
-            }
-
-        }
-
-        void begin_search(){
-            is_search = true;
-        }
-
-        // compute four distances
-        void distances_batch_4(
-                const idx_t idx0,
-                const idx_t idx1,
-                const idx_t idx2,
-                const idx_t idx3,
-                float& dis0,
-                float& dis1,
-                float& dis2,
-                float& dis3) final override {
-            ndis += 4;
-            if(is_search) {
-                // compute first, assign next
-                auto y0 = codes + idx0 * code_size;
-                auto y1 = codes + idx1 * code_size;
-                auto y2 = codes + idx2 * code_size;
-                auto y3 = codes + idx3 * code_size;
-
-                float dp0 = 0;
-                float dp1 = 0;
-                float dp2 = 0;
-                float dp3 = 0;
-                dp0=distance_to_code(y0);
-                dp1=distance_to_code(y1);
-                dp2=distance_to_code(y2);
-                dp3=distance_to_code(y3);
-                dis0 = dp0;
-                dis1 = dp1;
-                dis2 = dp2;
-                dis3 = dp3;
-            } else{
-                auto y0= new float[d];
-                auto y1= new float[d];
-                auto y2= new float[d];
-                auto y3= new float[d];
-                real_vectors->reconstruct(idx0,y0);
-                real_vectors->reconstruct(idx1,y1);
-                real_vectors->reconstruct(idx2,y2);
-                real_vectors->reconstruct(idx3,y3);
-
-                float dp0 =0;
-                float dp1 =0;
-                float dp2 =0;
-                float dp3 =0;
-
-                dp0=fvec_L2sqr(q_origin, y0, d);
-                dp1=fvec_L2sqr(q_origin, y1, d);
-                dp2=fvec_L2sqr(q_origin, y2, d);
-                dp3=fvec_L2sqr(q_origin, y3, d);
-
-                dis0 = dp0;
-                dis1 = dp1;
-                dis2 = dp2;
-                dis3 = dp3;
-
-            }
-        }
-    };
-
-    IndexLVQCodes::IndexLVQCodes(idx_t d, MetricType metric) : IndexFlatCodes(d*sizeof(uint8_t), metric) {
-        storage = new IndexFlat(d,metric);
-        mean_.resize(d,0.0);
-        this->d=d;
-
-    }
-
-    void IndexLVQCodes::add(idx_t n, const float* x) {
-        if (n == 0) {
-            return;
-        }
-        storage->add(n,x);
-        for (idx_t i = 0; i < n; i++) {
-            ntotal+=1;
-            auto new_data = x+i*d;
-            for (int j = 0; j < d; j++) {
-
-                auto div = (new_data[i] - mean_[i]) / ntotal;
-                mean_[i] += div;
-            }
-        }
-        codes.resize((ntotal) * code_size);
-        sa_encode(n, x, codes.data() + ((ntotal-n) * code_size));
-
-    }
-
-
-
-    void IndexLVQCodes::sa_encode(idx_t n, const float *x, uint8_t *bytes) const {
-
-        for(int i=0; i<n; i++){
-            auto data = x+i*d;
-            size_t min_index =0;
-            size_t max_index =0;
-            float min = data[min_index] - (mean_)[min_index];
-            float max = data[max_index] - (mean_)[max_index];
-
-            for(size_t j=1; j<d; j++){
-                if(data[j]-(mean_)[j]<min){
-                    min_index = j;
-                    min = data[j] - (mean_)[j];
-                } else if(data[j] - (mean_)[j]>max){
-                    max_index = j;
-                    max = data[j] - (mean_)[j];
-                }
-            }
-
-            float u = max;
-            float l = min;
-
-            float delta = (u-l)/(pow(2.0, 8)-1);
-            for(size_t j=0; j<d; j++){
-                float temp = (delta * (std::floor((data[j]-(mean_)[j]-l)/delta)+0.5) +l);
-                bytes[i*code_size+j] = (char)(0xff*temp);
-            }
-        }
-
-    }
-
-    void IndexLVQCodes::sa_decode(idx_t n, const uint8_t *bytes, float *x) const {
-        if (n > 0) {
-            memcpy(x, bytes, sizeof(float) * d * n);
-        }
-    }
-
-    void IndexLVQCodes::reconstruct_n(idx_t i0, idx_t ni, float *recons) const {
-        storage->reconstruct_n(i0, ni, recons);
-    }
-
-    void IndexLVQCodes::search(idx_t n, const float *x, idx_t k, float *distances, idx_t *labels,
-                               const SearchParameters *params) const {
-        storage->search(n,x,k,distances,labels,params);
-
-    }
-
-    DistanceComputer *IndexLVQCodes::get_distance_computer() const {
-        return new LVQDisL2(*this);
-    }
 
 
 } // namespace faiss

@@ -39,6 +39,7 @@ namespace faiss {
  * IndexHNSW.h for the full index object.
  */
 
+
 struct VisitedTable;
 struct DistanceComputer; // from AuxIndexStructures
 struct HNSWStats;
@@ -56,6 +57,9 @@ struct HNSW {
 
     typedef std::pair<float, storage_idx_t> Node;
 
+
+    std::vector<float>* mean_;
+    bool is_search = false;
     /** Heap structure that allows fast
      */
     struct MinimaxHeap {

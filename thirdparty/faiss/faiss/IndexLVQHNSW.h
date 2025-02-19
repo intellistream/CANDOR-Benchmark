@@ -30,39 +30,6 @@
 namespace faiss {
 
 
-    struct IndexLVQCodes: IndexFlatCodes{
-        IndexFlat* storage = nullptr;
-        std::vector<float> mean_;
-
-        explicit IndexLVQCodes(
-                idx_t d, ///< dimensionality of the input vectors
-        MetricType metric = METRIC_L2);
-
-
-        void sa_encode(idx_t n, const float* x, uint8_t* bytes) const override;
-        void sa_decode(idx_t n, const uint8_t* bytes, float* x) const override;
-
-        void reconstruct_n(idx_t i0, idx_t ni, float* recons) const override;
-
-        void add(idx_t n, const float* x) override;
-
-
-
-        void search(
-                idx_t n,
-                const float* x,
-                idx_t k,
-                float* distances,
-                idx_t* labels,
-                const SearchParameters* params = nullptr) const override;
-
-        DistanceComputer* get_distance_computer() const override;
-
-        const float* get_xb() const {
-            return (const float*)codes.data();
-        }
-
-    };
     struct IndexLVQHNSW;
 
     struct ReconstructFromNeighborsLVQ {
@@ -96,6 +63,8 @@ namespace faiss {
                 const float* query,
                 float* distances) const;
 
+
+
         /// called by add_codes
         void estimate_code(const float* x, storage_idx_t i, uint8_t* code) const;
 
@@ -116,6 +85,13 @@ namespace faiss {
 
         // the link strcuture
         HNSW LVQHNSW;
+
+
+        std::vector<float> mean_;
+        std::vector<uint8_t> lvqcodes;
+        std::vector<uint8_t> encoded_query;
+
+        bool is_search;
 
         // the sequential storage
         bool own_fields = false;

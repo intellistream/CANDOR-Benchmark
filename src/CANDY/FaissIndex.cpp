@@ -11,6 +11,8 @@
 #include <faiss/IndexVanama.h>
 #include <faiss/IndexMNRU.h>
 #include <faiss/IndexNSW.h>
+#include <faiss/IndexLVQHNSW.h>
+
 
 bool CANDY::FaissIndex::setConfig(INTELLI::ConfigMapPtr cfg) {
   AbstractIndex::setConfig(cfg);
@@ -35,6 +37,10 @@ bool CANDY::FaissIndex::setConfig(INTELLI::ConfigMapPtr cfg) {
       INTELLI_INFO("ENCAPSULATED FAISS INDEX: USE MNRUFlat");
       auto M = cfg->tryI64("maxConnection", 32, true);
       index = new faiss::IndexMNRUFlat(vecDim, M, faissMetric);
+  } else if (index_type == "LVQHNSW") {
+      INTELLI_INFO("ENCAPSULATED FAISS INDEX: USE MNRUFlat");
+      auto M = cfg->tryI64("maxConnection", 32, true);
+      index = new faiss::IndexLVQHNSWFlat(vecDim, M, faissMetric);
   } else if (index_type == "NSW") {
       INTELLI_INFO("ENCAPSULATED FAISS INDEX: USE NSWFlat");
       auto M = cfg->tryI64("maxConnection", 32, true);

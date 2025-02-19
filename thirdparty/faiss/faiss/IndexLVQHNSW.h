@@ -88,8 +88,8 @@ namespace faiss {
 
 
         std::vector<float> mean_;
-        std::vector<uint8_t> lvqcodes;
-        std::vector<uint8_t> encoded_query;
+        std::vector<int8_t> lvqcodes;
+        std::vector<int8_t> encoded_query;
 
         bool is_search;
 

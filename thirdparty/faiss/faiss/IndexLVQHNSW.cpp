@@ -72,17 +72,17 @@ namespace faiss {
 
 /* Wrap the distance computer into one that negates the
    distances. This makes supporting INNER_PRODUCE search easier */
-        float lvq_first_level(const float* x, uint8_t* new_codes, const std::vector<float> mean_, const int d);
+        float lvq_first_level(const float* x, int8_t* new_codes, const std::vector<float> mean_, const int d);
 struct NegativeDistanceComputer : DistanceComputer {
             /// owned by this
             DistanceComputer* basedis;
             //std::vector<uint8_t> lvq_codes;
-            const uint8_t* lvq_codes;
+            const int8_t* lvq_codes;
             int d;
             std::vector<float> mean_;
 
 
-        float int8vec_IP(const uint8_t *x, const uint8_t *y, size_t d) {
+        float int8vec_IP(const int8_t *x, const int8_t *y, size_t d) {
             int32_t product = 0;
             for (size_t i = 0; i < d; i++) {
                 product += (int32_t)(x[i] * y[i]);
@@ -91,7 +91,7 @@ struct NegativeDistanceComputer : DistanceComputer {
         }
 
 
-            std::vector<uint8_t> q;
+            std::vector<int8_t> q;
 
             explicit NegativeDistanceComputer(DistanceComputer* basedis)
                     : basedis(basedis) {}
@@ -158,7 +158,7 @@ struct NegativeDistanceComputer : DistanceComputer {
         }
 
 
-        float lvq_first_level(const float* x, uint8_t* new_codes, const std::vector<float> mean_, const int d) {
+        float lvq_first_level(const float* x, int8_t* new_codes, const std::vector<float> mean_, const int d) {
             size_t min_index =0;
             size_t max_index =0;
             float min = x[min_index] - (mean_)[min_index];
@@ -179,7 +179,7 @@ struct NegativeDistanceComputer : DistanceComputer {
 
             float delta = (u-l)/(pow(2.0, 8)-1);
             for(size_t i=0; i<d; i++){
-                float temp = (delta * (std::floor((x[i]-(mean_)[i]-l)/delta)+0.5) +l);
+                float temp = (delta * (std::floor((x[i]-mean_[i]-l)/delta)+0.5) +l);
                 new_codes[i] = (int)(0xff*temp);
             }
             return delta;
@@ -454,14 +454,7 @@ struct NegativeDistanceComputer : DistanceComputer {
         int max_level = LVQHNSW.prepare_level_tab(n, false);
         storage->add(n, x);
 
-        for(int i=0; i<n; i++) {
-            auto new_data = x+d*i;
-            ntotal++;
-            for (int j = 0; j < d; j++) {
-                auto div = (new_data[j] - mean_[j]) / ntotal;
-                mean_[j] += div;
-            }
-        }
+
         // lvq encoding
         lvqcodes.resize(ntotal*d);
         for(int i=n0;i<ntotal; i++){
@@ -475,6 +468,15 @@ struct NegativeDistanceComputer : DistanceComputer {
 
         LVQHNSW_add_vertices(*this, n0, n, x, verbose, LVQHNSW.levels.size() == ntotal,max_level);
         printf("adding %ld vectors finishes\n", n);
+
+        for(int i=0; i<n; i++) {
+            auto new_data = x+d*i;
+            ntotal++;
+            for (int j = 0; j < d; j++) {
+                auto div = (new_data[j] - mean_[j]) / ntotal;
+                mean_[j] += div;
+            }
+        }
     }
 
     void IndexLVQHNSW::reset() {

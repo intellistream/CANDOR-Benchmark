@@ -9,7 +9,8 @@
 
 namespace INTELLI {
 
-INTELLI::ThreadPool::ThreadPool(size_t numThreads) {
+INTELLI::ThreadPool::ThreadPool(size_t numThreads) : 
+    stop(false), activeTasks(0) {
   for (size_t i = 0; i < numThreads; ++i) {
     workers.emplace_back([this] {
       while (true) {
@@ -22,8 +23,11 @@ INTELLI::ThreadPool::ThreadPool(size_t numThreads) {
           if (this->stop && this->tasks.empty()) return;
           task = std::move(this->tasks.front());
           this->tasks.pop();
+          ++activeTasks;
         }
         task();
+        --activeTasks;
+        finishCondition.notify_one();
       }
     });
   }
@@ -48,7 +52,8 @@ void INTELLI::ThreadPool::enqueueTask(std::function<void()> task) {
 }
 
 void INTELLI::ThreadPool::waitForTasks() {
-  for (std::thread &worker : workers) worker.join();
+  std::unique_lock<std::mutex> lock(queueMutex);
+  finishCondition.wait(lock, [this] { return tasks.empty() && activeTasks == 0; });
 }
 
 }

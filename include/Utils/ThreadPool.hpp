@@ -34,7 +34,9 @@ class ThreadPool {
   std::queue<std::function<void()>> tasks;
   std::mutex queueMutex;
   std::condition_variable condition;
-  bool stop = false;
+  std::condition_variable finishCondition;
+  std::atomic<size_t> activeTasks;
+  bool stop;
 };
 
 }

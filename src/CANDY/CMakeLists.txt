@@ -10,7 +10,7 @@ add_sources(
         OnlinePQIndex.cpp
         #OnlineIVFLSHIndex.cpp
         #OnlineIVFL2HIndex.cpp
-        #        IndexTable.cpp
+#        IndexTable.cpp
         #PQIndex.cpp
         HNSWNaiveIndex.cpp
         FaissIndex.cpp
@@ -22,7 +22,6 @@ add_sources(
         DPGIndex.cpp
         LSHAPGIndex.cpp
         FlatGPUIndex.cpp
-        ConcurrentIndex.cpp
 )
 add_subdirectory(HashingModels)
 add_subdirectory(ParallelPartitionIndex)
@@ -34,15 +33,14 @@ add_subdirectory(CongestionDropIndex)
 add_subdirectory(FlannIndex)
 add_subdirectory(LSHAPGIndex)
 add_subdirectory(FlatGPUIndex)
-
-if (ENABLE_CUDA)
-    add_subdirectory(SONG)
-endif ()
-
 if (ENABLE_RAY)
     add_subdirectory(DistributedPartitionIndex)
     add_sources(DistributedPartitionIndex.cpp)
 endif ()
 if (ENABLE_SPTAG)
     add_sources(SPTAGIndex.cpp)
+endif ()
+if (ENABLE_CUDA)
+   add_subdirectory(SONG)
+   add_subdirectory(GANNSIndex)
 endif ()

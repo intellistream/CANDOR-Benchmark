@@ -1,15 +1,11 @@
-#set(CMAKE_C_COMPILER "/usr/bin/gcc-11")
-#set(CMAKE_CXX_COMPILER "/usr/bin/g++-11")
-#set(CMAKE_CUDA_HOST_COMPILER "${CMAKE_CXX_COMPILER}")
+
 cmake_minimum_required(VERSION 3.27)
 project(CANDYBENCH CXX)
-
 option(ENABLE_CUDA "Enable cuda" ON)
 message(STATUS "1.0 CUDA enabled: ${ENABLE_CUDA}")
 include (cmake/FindCuda.cmake)
 include (cmake/FindTorch.cmake)
-#set(CMAKE_CUDA_ARCHITECTURES "70;75;80")
-set(CMAKE_CUDA_ARCHITECTURES ALL)
+set(CMAKE_CUDA_ARCHITECTURES all)
 find_package(Torch REQUIRED)
 find_package(Python3 REQUIRED COMPONENTS Development)
 include_directories(${Python3_INCLUDE_DIRS})
@@ -33,8 +29,6 @@ include(cmake/default.cmake)
 # First compile faiss before anything else
 #set(CMAKE_CXX_FLAGS "-fno-openmp")
 #test avx2
-
-# Option to enable/disable CUDA
 message(STATUS "2.0 CUDA enabled: ${ENABLE_CUDA}")
 if (ENABLE_CUDA)
     enable_language(CUDA)
@@ -45,7 +39,6 @@ if (ENABLE_CUDA)
 else()
     message(STATUS "CUDA is not enabled")
 endif ()
-
 add_subdirectory(thirdparty/faiss)
 
 # Set specific options for Faiss compilation
@@ -282,10 +275,10 @@ else ()
     find_package(glog)
     #set(GFLAGS_LIBRARIES /usr/local/lib/libgflags.so)
     #set(GLOG_LIBRARIES /usr/local/lib/libglog.so)
-    #
+#
     add_compile_definitions(GLOG_USE_GLOG_EXPORT)
     set(LIBRARIES ${LIBRARIES} gflags)
-    #
+#
     set(LIBRARIES ${LIBRARIES} glog)
 
 
@@ -342,20 +335,18 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/)
 # Add Library
 get_sources(CANDY_SOURCE_FILES)
 get_headers(CANDY_HEADER_FILES)
-
+#add_library(CANDYBENCH SHARED ${CANDY_SOURCE_FILES} ${CANDY_HEADER_FILES} ${CMAKE_CURRENT_BINARY_DIR})
 if (ENABLE_CUDA)
     set_source_files_properties(src/CANDY/IndexTable.cpp
+            src/CANDY/GANNSIndex/GANNSIndex.cu
             PROPERTIES
             LANGUAGE CUDA
     )
 endif ()
-
 add_library(CANDYBENCH SHARED ${CANDY_SOURCE_FILES} ${CANDY_HEADER_FILES} ${CMAKE_CURRENT_BINARY_DIR}
         src/CANDY/IndexTable.cpp)
-
 set_property(TARGET CANDYBENCH PROPERTY CXX_STANDARD 20)
 target_include_directories(CANDYBENCH PUBLIC "include")
-
 if (ENABLE_CUDA)
     set(LIBRARIES ${LIBRARIES} cublas cudart)
     set_target_properties(CANDYBENCH PROPERTIES
@@ -367,7 +358,6 @@ else ()
             CXX_STANDARD 20
     )
 endif ()
-
 # 设置 MKL 库的路径
 set(MKL_INCLUDE_DIR "/usr/include/mkl")
 set(MKL_LIB_DIR "/usr/lib/x86_64-linux-gnu")

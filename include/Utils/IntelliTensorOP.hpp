@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <iostream>
 #include <fstream>
+#include <faiss/MetricType.h>
 /**
  *  @ingroup INTELLI_UTIL
  *  @{

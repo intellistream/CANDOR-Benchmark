@@ -37,6 +37,7 @@
 #endif
 #ifdef ENABLE_CUDA
 #include <CANDY/SONG/SONG.hpp>
+#include <CANDY/GANNSIndex/GANNSIndex.h>
 #endif
 namespace CANDY {
 CANDY::IndexTable::IndexTable() {
@@ -62,9 +63,6 @@ CANDY::IndexTable::IndexTable() {
   indexMap["DPG"] = newDPGIndex();
   indexMap["LSHAPG"] = newLSHAPGIndex();
   indexMap["flatGPU"] = newFlatGPUIndex();
-#ifdef ENABLE_CUDA
-  indexMap["SONG"] = newSONG();
-#endif
 #if CANDY_CL == 1
   // indexMap["cl"] = newCLMMCPPAlgo();
 #endif
@@ -73,6 +71,11 @@ CANDY::IndexTable::IndexTable() {
 #endif
 #if CANDY_SPTAG == 1
   indexMap["SPTAG"] = newSPTAGIndex();
+#endif
+#ifdef ENABLE_CUDA
+  indexMap["SONG"] = newSONG();
+  indexMap["GANNSHNSW"] = newGANNSIndex("hnsw");
+  indexMap["GANNSNSW"] = newGANNSIndex("nsw");
 #endif
 }
 }  // namespace CANDY

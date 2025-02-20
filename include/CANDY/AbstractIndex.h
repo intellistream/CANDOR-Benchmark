@@ -90,6 +90,13 @@ class AbstractIndex {
    * @param t the tensor, some index need to be single row
    * @return bool whether the insertion is successful
    */
+  virtual std::map<std::string, double> ccGetMetrics();
+  /**
+   * @brief insert a tensor
+   * @note This is majorly an online function
+   * @param t the tensor, some index need to be single row
+   * @return bool whether the insertion is successful
+   */
   virtual bool insertTensor(torch::Tensor &t);
 
     /**

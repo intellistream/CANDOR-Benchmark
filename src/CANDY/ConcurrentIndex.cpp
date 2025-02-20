@@ -46,25 +46,38 @@ bool CANDY::ConcurrentIndex::ccInsertAndSearchTensor(torch::Tensor &t, torch::Te
 
   size_t insertTotal = t.size(0);
   size_t searchTotal = insertTotal * ((1 - writeRatio) / writeRatio);
-
   size_t qtSize = qt.size(0);
   size_t searchBatchSize = batchSize * ((1 - writeRatio) / writeRatio);
 
-  std::atomic<size_t> insertOps = 0, searchOps = 0;
+  std::atomic<size_t> nextInsertIdx = 0, nextSearchIdx = 0;
+  std::atomic<size_t> completedInserts = 0, completedSearches = 0;
+
   std::exception_ptr lastException = nullptr;
   std::mutex lastExceptMutex, resultMutex, bufferMutex;
 
   INTELLI::ThreadPool pool(numThreads);
-  std::vector<SearchRecord> globalSearchBuffer;
 
-  while (insertOps < insertTotal || searchOps < searchTotal) {
-    for (size_t i = 0; i < batchSize; ++i) {
-      size_t idx = insertOps.fetch_add(1);
-      if (idx >= insertTotal) break;
+  thread_local std::vector<SearchRecord> localSearchBuffer;
+
+  thread_local std::vector<double> localInsertLatencies, localSearchLatencies;
+
+  auto startTime = std::chrono::high_resolution_clock::now();
+
+  while (nextInsertIdx < insertTotal || nextSearchIdx < searchTotal) {
+    size_t startInsert = nextInsertIdx.fetch_add(batchSize);
+    size_t endInsert = std::min(startInsert + batchSize, insertTotal);
+
+    for (size_t idx = startInsert; idx < endInsert; ++idx) {
       pool.enqueueTask([&, idx] {
+        auto taskStart = std::chrono::high_resolution_clock::now();
         try {
           auto in = t[idx];
           myIndexAlgo->insertTensor(in);
+          completedInserts.fetch_add(1);
+
+          auto taskEnd = std::chrono::high_resolution_clock::now();
+          double latency = std::chrono::duration<double, std::milli>(taskEnd - taskStart).count();
+          localInsertLatencies.push_back(latency);
         } catch (...) {
           std::unique_lock<std::mutex> lock(lastExceptMutex);
           lastException = std::current_exception();
@@ -72,16 +85,23 @@ bool CANDY::ConcurrentIndex::ccInsertAndSearchTensor(torch::Tensor &t, torch::Te
       });
     }
 
-    for (size_t i = 0; i < searchBatchSize; ++i) {
-      size_t idx = searchOps.fetch_add(1);
-      if (idx >= searchTotal) break;
+    size_t startSearch = nextSearchIdx.fetch_add(searchBatchSize);
+    size_t endSearch = std::min(startSearch + searchBatchSize, searchTotal);
+
+    for (size_t idx = startSearch; idx < endSearch; ++idx) {
       pool.enqueueTask([&, idx] {
+        auto taskStart = std::chrono::high_resolution_clock::now();
         try {
           size_t queryIdx = randomMode ? (std::rand() % qtSize) : (idx % qtSize);
           auto q = qt[queryIdx];
           auto res = myIndexAlgo->searchTensor(q, k);
-          std::unique_lock<std::mutex> lock(bufferMutex);
-          globalSearchBuffer.emplace_back(queryIdx, queryIdx, res);
+          completedSearches.fetch_add(1);
+
+          auto taskEnd = std::chrono::high_resolution_clock::now();
+          double latency = std::chrono::duration<double, std::milli>(taskEnd - taskStart).count();
+          localSearchLatencies.push_back(latency);
+
+          localSearchBuffer.emplace_back(queryIdx, queryIdx, res);
         } catch (...) {
           std::unique_lock<std::mutex> lock(lastExceptMutex);
           lastException = std::current_exception();
@@ -90,18 +110,60 @@ bool CANDY::ConcurrentIndex::ccInsertAndSearchTensor(torch::Tensor &t, torch::Te
     }
   }
 
-  pool.waitForTasks();
+  pool.waitForTasks(); 
+
+  auto endTime = std::chrono::high_resolution_clock::now();
+  double elapsedSec = std::chrono::duration<double>(endTime - startTime).count();
+
+  insertThroughput = completedInserts / elapsedSec;
+  searchThroughput = completedSearches / elapsedSec;
+
+  std::vector<double> insertLatencies, searchLatencies;
+  insertLatencies.insert(insertLatencies.end(), localInsertLatencies.begin(), localInsertLatencies.end());
+  searchLatencies.insert(searchLatencies.end(), localSearchLatencies.begin(), localSearchLatencies.end());
 
   {
     std::unique_lock<std::mutex> lock(resultMutex);
-    searchRes.insert(searchRes.end(), globalSearchBuffer.begin(), globalSearchBuffer.end());
+    searchRes.insert(searchRes.end(), localSearchBuffer.begin(), localSearchBuffer.end());
   }
 
   if (lastException) {
     std::rethrow_exception(lastException);
   }
 
+  auto getPercentile = [](std::vector<double> &latencies, double percentile) -> double {
+    if (latencies.empty()) return 0.0;
+    std::sort(latencies.begin(), latencies.end());
+    size_t index = static_cast<size_t>(percentile * latencies.size() / 100.0);
+    return latencies[std::min(index, latencies.size() - 1)];
+  };
+
+  auto getAverageLatency = [](const std::vector<double> &latencies) -> double {
+    if (latencies.empty()) return 0.0;
+    return std::accumulate(latencies.begin(), latencies.end(), 0.0) / latencies.size();
+  };
+
+  insertLatencyAvg = getAverageLatency(insertLatencies);
+  insertLatency95 = getPercentile(insertLatencies, 95.0);
+
+  searchLatencyAvg = getAverageLatency(searchLatencies);
+  searchLatency95 = getPercentile(searchLatencies, 95.0);
+
   return true;
+}
+
+std::map<string, double> CANDY::ConcurrentIndex::ccGetMetrics() {
+  std::map<string, double> metrics;
+  metrics["insertThroughput"] = insertThroughput;
+  metrics["searchThroughput"] = searchThroughput;
+
+  metrics["insertLatencyAvg"] = insertLatencyAvg;
+  metrics["searchLatencyAvg"] = searchLatencyAvg;
+  
+  metrics["insertLatency95"] = insertLatency95;
+  metrics["searchLatency95"] = searchLatency95;
+
+  return metrics;
 }
 
 bool CANDY::ConcurrentIndex::ccSaveResultAsFile(std::string &outFile) {

@@ -35,6 +35,15 @@ class ConcurrentIndex : public CANDY::AbstractIndex {
   int64_t initSize = 0;
   int64_t randomMode = true;
 
+  double insertThroughput = 0.0;
+  double searchThroughput = 0.0;
+
+  double insertLatencyAvg = 0.0;
+  double searchLatencyAvg = 0.0;
+
+  double insertLatency95 = 0.0;
+  double searchLatency95 = 0.0;
+
   std::vector<SearchRecord> searchRes;
 
  public:
@@ -55,6 +64,8 @@ class ConcurrentIndex : public CANDY::AbstractIndex {
   virtual bool ccInsertAndSearchTensor(torch::Tensor &t, torch::Tensor &qt, int64_t k);
 
   virtual bool ccSaveResultAsFile(std::string &resFile);
+
+  virtual std::map<std::string, double> ccGetMetrics();
 
   virtual std::vector<torch::Tensor> searchTensor(torch::Tensor &q, int64_t k);
 };

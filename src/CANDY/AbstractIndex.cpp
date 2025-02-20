@@ -89,6 +89,11 @@ bool CANDY::AbstractIndex::ccSaveResultAsFile(std::string &outFile) {
   return false;
 }
 
+std::map<std::string, double> CANDY::AbstractIndex::ccGetMetrics() {
+  std::map<std::string, double> m;
+  return m;
+}
+
 bool CANDY::AbstractIndex::loadInitialStringObject(torch::Tensor &t, std::vector<std::string> &strs) {
   return insertStringObject(t, strs);
 }

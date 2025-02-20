@@ -31,9 +31,8 @@ bool CANDY::NSWlibIndex::setConfig(INTELLI::ConfigMapPtr cfg) {
 bool CANDY::NSWlibIndex::insertTensor(torch::Tensor &t) {
   if (!index) throw std::runtime_error("NSWlib_HNSW not initialized");
   auto vec = t.to(torch::kCPU).contiguous();
-  std::cout << "start inserting " << count << std::endl;
-  index->addPoint(vec.data_ptr<float>(), count++);
-  std::cout << "end inserting " << count << std::endl;
+  int64_t curCnt = count.fetch_add(1, std::memory_order_relaxed);
+  index->addPoint(vec.data_ptr<float>(), curCnt);
   return true;
 }
 

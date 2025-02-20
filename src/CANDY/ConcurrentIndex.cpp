@@ -44,18 +44,24 @@ bool CANDY::ConcurrentIndex::ccInsertAndSearchTensor(torch::Tensor &t, torch::Te
     return false;
   }
 
-  size_t writeTotal = t.size(0);
-  size_t searchTotal = qt.size(0);
-  size_t insertOps = 0, searchOps = 0;
+  size_t insertTotal = t.size(0);
+  size_t searchTotal = insertTotal * ((1 - writeRatio) / writeRatio);
+
+  size_t qtSize = qt.size(0);
+  size_t searchBatchSize = batchSize * ((1 - writeRatio) / writeRatio);
+
+  std::atomic<size_t> insertOps = 0, searchOps = 0;
   std::exception_ptr lastException = nullptr;
   std::mutex lastExceptMutex, resultMutex, bufferMutex;
 
   INTELLI::ThreadPool pool(numThreads);
   std::vector<SearchRecord> globalSearchBuffer;
 
-  while (insertOps < writeTotal || searchOps < searchTotal) {
-    for (size_t i = 0; i < batchSize && insertOps < writeTotal; ++i, ++insertOps) {
-      pool.enqueueTask([&, idx = insertOps] {
+  while (insertOps < insertTotal || searchOps < searchTotal) {
+    for (size_t i = 0; i < batchSize; ++i) {
+      size_t idx = insertOps.fetch_add(1);
+      if (idx >= insertTotal) break;
+      pool.enqueueTask([&, idx] {
         try {
           auto in = t[idx];
           myIndexAlgo->insertTensor(in);
@@ -66,10 +72,12 @@ bool CANDY::ConcurrentIndex::ccInsertAndSearchTensor(torch::Tensor &t, torch::Te
       });
     }
 
-    for (size_t i = 0; i < batchSize && searchOps < searchTotal; ++i, ++searchOps) {
-      pool.enqueueTask([&, idx = searchOps] {
+    for (size_t i = 0; i < searchBatchSize; ++i) {
+      size_t idx = searchOps.fetch_add(1);
+      if (idx >= searchTotal) break;
+      pool.enqueueTask([&, idx] {
         try {
-          size_t queryIdx = randomMode ? (std::rand() % searchTotal) : idx;
+          size_t queryIdx = randomMode ? (std::rand() % qtSize) : (idx % qtSize);
           auto q = qt[queryIdx];
           auto res = myIndexAlgo->searchTensor(q, k);
           std::unique_lock<std::mutex> lock(bufferMutex);

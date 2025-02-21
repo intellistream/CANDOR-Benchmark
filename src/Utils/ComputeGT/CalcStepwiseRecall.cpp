@@ -1,4 +1,4 @@
-#include <Utils/ComputeGT/StepwiseRecall.hpp>
+#include <Utils/ComputeGT/CalcStepwiseRecall.hpp>
 
 #include <iostream>
 #include <fstream>
@@ -38,9 +38,9 @@ bool COMPUTE_GT::readStepwiseFile(const std::string& filename, uint64_t& npts, u
   return true;
 }
 
-double COMPUTE_GT::computeRecallWithQueryVec(const std::vector<std::vector<float>>& queryVectors,
-                                              const std::vector<std::vector<float>>& annsResult,
-                                              const std::vector<std::vector<float>>& gtVectors) {
+double COMPUTE_GT::calcRecallWithQueryVec(const std::vector<std::vector<float>>& queryVectors,
+                                            const std::vector<std::vector<float>>& annsResult,
+                                            const std::vector<std::vector<float>>& gtVectors) {
   if (queryVectors.empty() || annsResult.empty() || gtVectors.empty()) {
     std::cerr << "Error: Input vectors cannot be empty." << std::endl;
     return 0.0;
@@ -94,7 +94,7 @@ void COMPUTE_GT::calcStepwiseRecall(const std::string& annsFile,
   std::vector<std::vector<float>> annsResult;
 
   while (readStepwiseFile(annsFile, batchNpts, batchNdims, &queryIndices, annsResult, true)) {
-    double recall = computeRecallWithQueryVec(gtVectors, annsResult, gtVectors);
+    double recall = calcRecallWithQueryVec(gtVectors, annsResult, gtVectors);
     std::ofstream file(outFile, std::ios::app);
     if (!file) {
       std::cerr << "Failed to open output file." << std::endl;

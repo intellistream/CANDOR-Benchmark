@@ -1,5 +1,12 @@
-#ifndef UTILS_COMPUTE_GT_STEPWISE_GT_HPP
-#define UTILS_COMPUTE_GT_STEPWISE_GT_HPP
+/*
+ *  Copyright (C) 2024 by the INTELLI team
+ *  Created by: Junyao Dong
+ *  Created on: 2025/02/14
+ *  Description:
+ */
+
+#ifndef UTILS_COMPUTE_GT_COMPUTE_GT_HPP
+#define UTILS_COMPUTE_GT_COMPUTE_GT_HPP
 
 #include <iostream>
 #include <fstream>
@@ -32,12 +39,10 @@ void innerProdToPoints(const size_t dim, float* distMatrix, size_t npoints, cons
                           size_t nqueries, const float* queries, float* onesVec = nullptr);
 
 void exactKnn(const size_t dim, const size_t k, size_t* closestPoints, float* distClosestPoints,
-                size_t npoints, float* pointsIn, size_t nqueries, float* queriesIn,
-                Metric metric);
+                size_t npoints, float* pointsIn, size_t nqueries, float* queriesIn, Metric metric);
 
-void calcStepwiseGT(const std::string& baseFile, const std::string& queryFile,
-                      const std::string& gtFile, size_t k, const std::string& distFn,
-                      size_t batchSize, size_t initSize);
+void computeVecGT(const std::string& baseFile, const std::string& queryFile,
+                    const std::string& gtFile, size_t k, const std::string& distFn);
 
 template <class T> T *aligned_malloc(const size_t n, const size_t alignment) {
   return static_cast<T *>(aligned_alloc(alignment, sizeof(T) * n));
@@ -78,4 +83,4 @@ inline void loadBinAsFloat(const char *filename, float *&data, size_t &npts, siz
 
 }
 
-#endif // UTILS_COMPUTE_GT_STEPWISE_GT_HPP
+#endif // UTILS_COMPUTE_GT_COMPUTE_GT_HPP

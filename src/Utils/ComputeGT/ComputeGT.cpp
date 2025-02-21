@@ -1,5 +1,11 @@
-#include <Utils/ComputeGT/StepwiseGT.hpp>
-#include <Utils/ComputeGT/StepwiseRecall.hpp>
+/*
+ *  Copyright (C) 2024 by the INTELLI team
+ *  Created by: Junyao Dong
+ *  Created on: 2025/02/21
+ *  Description:
+ */
+
+#include <Utils/ComputeGT/ComputeGT.hpp>
 
 #include <iostream>
 #include <string>
@@ -78,9 +84,8 @@ void COMPUTE_GT::exactKnn(const size_t dim, const size_t k, size_t* closestPoint
   delete[] queriesL2sq;
 }
 
-void COMPUTE_GT::calcStepwiseGT(const std::string& baseFile, const std::string& queryFile,
-                                  const std::string& gtFile, size_t k, 
-                                  const std::string& distFn, size_t batchSize, size_t initialCount) {
+void COMPUTE_GT::computeVecGT(const std::string& baseFile, const std::string& queryFile,
+                                const std::string& gtFile, size_t k, const std::string& distFn) {
   COMPUTE_GT::Metric metric;
   if (distFn == "l2") {
     metric = COMPUTE_GT::Metric::L2;
@@ -97,20 +102,11 @@ void COMPUTE_GT::calcStepwiseGT(const std::string& baseFile, const std::string& 
   size_t npoints, dim;
   loadBinAsFloat<float>(baseFile.c_str(), baseData, npoints, dim, 0);
 
-  if (initialCount > npoints) {
-    std::cerr << "Initial count exceeds total number of points." << std::endl;
-    delete[] baseData;
-    return;
-  }
-
   float* queryData = nullptr;
   size_t nqueries;
   loadBinAsFloat<float>(queryFile.c_str(), queryData, nqueries, dim, 0);
 
-  size_t currentPoints = initialCount;
-  size_t step = 0;
-
-  std::ofstream writer(gtFile, std::ios::binary | std::ios::app);
+  std::ofstream writer(gtFile, std::ios::binary);
   if (!writer) {
     std::cerr << "Error opening file: " << gtFile << std::endl;
     delete[] baseData;
@@ -118,41 +114,37 @@ void COMPUTE_GT::calcStepwiseGT(const std::string& baseFile, const std::string& 
     return;
   }
 
-  while (currentPoints < npoints) {
-    size_t nextStepPoints = currentPoints + batchSize > npoints ? npoints : currentPoints + batchSize;
-    size_t insertCount = nextStepPoints - currentPoints;
-    currentPoints = nextStepPoints;
-    step++;
+  float* gtVectors = new float[nqueries * k * dim];
+  size_t* closestPoints = new size_t[nqueries * k];
+  float* distClosestPoints = new float[nqueries * k];
 
-    float* gtVectors = new float[nqueries * dim];
-    size_t* closestPoints = new size_t[nqueries * k];
-    float* distClosestPoints = new float[nqueries * k];
+  exactKnn(dim, k, closestPoints, distClosestPoints, npoints, baseData, nqueries, queryData, metric);
 
-    exactKnn(dim, k, closestPoints, distClosestPoints, currentPoints, baseData, nqueries, queryData, metric);
-
-    for (size_t i = 0; i < nqueries; i++) {
-      size_t gtIdx = closestPoints[i * k];
-      std::memcpy(gtVectors + i * dim, baseData + gtIdx * dim, dim * sizeof(float));
+  for (size_t i = 0; i < nqueries; i++) {
+    for (size_t j = 0; j < k; j++) {
+      size_t gtIdx = closestPoints[i * k + j];
+      std::memcpy(gtVectors + (i * k + j) * dim, baseData + gtIdx * dim, dim * sizeof(float));
     }
-
-    uint64_t step64 = static_cast<uint64_t>(step);
-    writer.write(reinterpret_cast<const char*>(&step64), sizeof(step64));
-    writer.write(reinterpret_cast<const char*>(&insertCount), sizeof(insertCount));
-    writer.write(reinterpret_cast<const char*>(&dim), sizeof(dim));
-
-    for (size_t i = 0; i < nqueries; i++) 
-      writer.write(reinterpret_cast<const char*>(&i), sizeof(i));  
-    writer.write(reinterpret_cast<const char*>(gtVectors), nqueries * dim * sizeof(float));
-
-    delete[] gtVectors;
-    delete[] closestPoints;
-    delete[] distClosestPoints;
-
-    std::cout << "Step " << step << " completed. Inserted " << insertCount 
-              << " vectors. Total: " << currentPoints << std::endl;
   }
 
+  uint32_t nqueriesI32 = static_cast<uint32_t>(nqueries);
+  uint32_t kI32 = static_cast<uint32_t>(k);
+  uint32_t dimI32 = static_cast<uint32_t>(dim);
+
+  writer.write(reinterpret_cast<char*>(&nqueriesI32), sizeof(uint32_t));
+  writer.write(reinterpret_cast<char*>(&kI32), sizeof(uint32_t));
+  writer.write(reinterpret_cast<char*>(&dimI32), sizeof(uint32_t));
+
+  writer.write(reinterpret_cast<char*>(gtVectors), nqueries * k * dim * sizeof(float));
+
+  writer.write(reinterpret_cast<char*>(distClosestPoints), nqueries * k * sizeof(float));
+
   writer.close();
+  delete[] gtVectors;
+  delete[] closestPoints;
+  delete[] distClosestPoints;
   delete[] baseData;
   delete[] queryData;
+
+  std::cout << "Compute GT done on file: " <<  gtFile << std::endl;
 }

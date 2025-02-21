@@ -10,8 +10,9 @@
 #include <Utils/ConfigMap.hpp>
 #include <Utils/IntelliLog.h>
 #include <Utils/SPSCQueue.hpp>
-#include <Utils/ComputeGT/StepwiseGT.hpp>
-#include <Utils/ComputeGT/StepwiseRecall.hpp>
+#include <Utils/ComputeGT/ComputeGT.hpp>
+#include <Utils/ComputeGT/ComputeStepwiseGT.hpp>
+#include <Utils/ComputeGT/CalcStepwiseRecall.hpp>
 #include <CANDY/AbstractIndex.h>
 
 
@@ -356,8 +357,8 @@ PYBIND11_MODULE(PyCANDYAlgo, m) {
       .def("resultToConfigMap", &INTELLI::ThreadPerfPAPI::resultToConfigMap);
 #endif
 
-
-  m.def("calc_stepwise_gt", &COMPUTE_GT::calcStepwiseGT, "Calculate stepwise ground truth");
+  m.def("compute_vec_gt", &COMPUTE_GT::computeVecGT, "Compute ground truth in vectors");
+  m.def("compute_stepwise_gt", &COMPUTE_GT::computeStepwiseGT, "Compute stepwise ground truth");
   m.def("calc_stepwise_recall", &COMPUTE_GT::calcStepwiseRecall, "Calculate stepwise recall");
 
   auto m_puck = m.def_submodule("puck", "Puck Interface from Baidu.");

@@ -1,5 +1,6 @@
 add_sources(
-  StepwiseGT.cpp
-  StepwiseRecall.cpp
+  ComputeGT.cpp
+  ComputeStepwiseGT.cpp
+  CalcStepwiseRecall.cpp
 )
 

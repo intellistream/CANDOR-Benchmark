@@ -85,11 +85,7 @@ bool CANDY::AbstractIndex::ccInsertAndSearchTensor(torch::Tensor &t, torch::Tens
   return false; 
 }
 
-bool CANDY::AbstractIndex::ccSaveResultAsFile(std::string &outFile) {
-  return false;
-}
-
-std::map<std::string, double> CANDY::AbstractIndex::ccGetMetrics() {
+std::map<std::string, double> CANDY::AbstractIndex::ccSaveAndGetResults(std::string &outFile) {
   std::map<std::string, double> m;
   return m;
 }

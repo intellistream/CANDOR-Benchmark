@@ -46,7 +46,7 @@ class CMakeBuild(build_ext):
         cmake_args = ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + extdir,
                       '-DPYTHON_EXECUTABLE=' + sys.executable,
                       '-DCMAKE_PREFIX_PATH='+torchCmake,
-                      '-DENABLE_HDF5=OFF', 
+                      '-DENABLE_HDF5=ON', 
                       '-DENABLE_PYBIND=ON',
                       '-DCMAKE_INSTALL_PREFIX=/usr/local/lib',
                       '-DENABLE_PAPI=OFF',

@@ -16,6 +16,13 @@
 #include <CANDY/AbstractIndex.h>
 #include <CANDY/IndexTable.h>
 
+#define HDF5_GROUP_NAME "/cc_search_results"
+#define HDF5_QUERY_IDX_NAME "queryIdx"
+#define HDF5_STEP_NAME "step"
+
+#define HDF5_QUERY_GROUP_PREFIX "/cc_search_results/query_"
+#define HDF5_DATA_PREFIX "/tensor_"
+
 using BatchIndex = size_t;
 using QueryIndex = size_t;
 using SearchResults = std::vector<torch::Tensor>;
@@ -63,9 +70,7 @@ class ConcurrentIndex : public CANDY::AbstractIndex {
 
   virtual bool ccInsertAndSearchTensor(torch::Tensor &t, torch::Tensor &qt, int64_t k);
 
-  virtual bool ccSaveResultAsFile(std::string &resFile);
-
-  virtual std::map<std::string, double> ccGetMetrics();
+  virtual std::map<std::string, double> ccSaveAndGetResults(std::string &outFile);
 
   virtual std::vector<torch::Tensor> searchTensor(torch::Tensor &q, int64_t k);
 };

@@ -203,6 +203,8 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${DiskANN_BUILD_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${DiskANN_BUILD_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${DiskANN_BUILD_DIR}/lib)
 
+find_package(HDF5 REQUIRED COMPONENTS CXX)
+
 find_package(OpenMP REQUIRED)
 
 if (NOT ENABLE_DiskANN)
@@ -275,7 +277,7 @@ configure_file(
 
 add_subdirectory(thirdparty/hnswlib)
 include_directories(thirdparty/hnswlib/hnswlib)
-set(LIBRARIES ${LIBRARIES}  hnswlib)
+set(LIBRARIES ${LIBRARIES} hnswlib)
 
 # Reset output directories for the rest of your project
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -372,6 +374,15 @@ endif ()
 if(OpenMP_CXX_FOUND)
     target_link_libraries(CANDYBENCH PRIVATE OpenMP::OpenMP_CXX)
 endif()
+
+if (HDF5_FOUND)
+    message(STATUS "HDF5_INCLUDE_DIRS: ${HDF5_INCLUDE_DIRS}") # 添加此行
+    include_directories(${HDF5_INCLUDE_DIRS})
+    target_link_libraries(CANDYBENCH PRIVATE ${HDF5_LIBRARIES})
+else ()
+    message(STATUS "HDF5 NOT FOUND ")
+endif()
+
 target_link_options(CANDYBENCH PUBLIC "-Wl,-rpath,./")
 target_link_options(CANDYBENCH PUBLIC "-Wl,-rpath,./")
 message(WARNING "CANDY GFLAGS_LIBRARY_DIR: ${GFLAGS_LIBRARIES}")

@@ -11,6 +11,7 @@
 #include <time.h>
 #include <chrono>
 #include <assert.h>
+#include <H5Cpp.h>
 
 bool CANDY::ConcurrentIndex::setConfig(INTELLI::ConfigMapPtr cfg) {
   assert(cfg);
@@ -71,7 +72,7 @@ bool CANDY::ConcurrentIndex::ccInsertAndSearchTensor(torch::Tensor &t, torch::Te
       pool.enqueueTask([&, idx] {
         auto taskStart = std::chrono::high_resolution_clock::now();
         try {
-          auto in = t[idx];
+        auto in = t[idx];
           myIndexAlgo->insertTensor(in);
           completedInserts.fetch_add(1);
 
@@ -152,7 +153,7 @@ bool CANDY::ConcurrentIndex::ccInsertAndSearchTensor(torch::Tensor &t, torch::Te
   return true;
 }
 
-std::map<string, double> CANDY::ConcurrentIndex::ccGetMetrics() {
+std::map<string, double> CANDY::ConcurrentIndex::ccSaveAndGetResults(std::string &outFile) {
   std::map<string, double> metrics;
   metrics["insertThroughput"] = insertThroughput;
   metrics["searchThroughput"] = searchThroughput;
@@ -163,32 +164,37 @@ std::map<string, double> CANDY::ConcurrentIndex::ccGetMetrics() {
   metrics["insertLatency95"] = insertLatency95;
   metrics["searchLatency95"] = searchLatency95;
 
-  return metrics;
-}
+  H5::H5File file(outFile, H5F_ACC_TRUNC);
+  H5::Group group = file.createGroup(HDF5_GROUP_NAME);
 
-bool CANDY::ConcurrentIndex::ccSaveResultAsFile(std::string &outFile) {
-  std::ofstream file(outFile, std::ios::binary);
-  if (!file.is_open()) {
-    throw std::runtime_error("Failed to open result file.");
-    return false;
-  }
-  
-  for (const auto& rec : searchRes) {
+  for (size_t i = 0; i < searchRes.size(); ++i) {
+    const auto& rec = searchRes[i];
     uint64_t step = std::get<0>(rec);
     uint64_t queryIdx = std::get<1>(rec);
-    auto results = std::get<2>(rec);
+    const auto& results = std::get<2>(rec);
 
-    file.write(reinterpret_cast<const char*>(&step), sizeof(step));
-    file.write(reinterpret_cast<const char*>(&queryIdx), sizeof(queryIdx));
+    std::string queryGroupName = HDF5_QUERY_GROUP_PREFIX + std::to_string(i);
+    H5::Group queryGroup = group.createGroup(queryGroupName);
 
-    for (const auto& tensor : results) {
+    queryGroup.createAttribute(HDF5_STEP_NAME, H5::PredType::NATIVE_UINT64, H5::DataSpace(H5S_SCALAR))
+      .write(H5::PredType::NATIVE_UINT64, &step);
+    queryGroup.createAttribute(HDF5_QUERY_IDX_NAME, H5::PredType::NATIVE_UINT64, H5::DataSpace(H5S_SCALAR))
+      .write(H5::PredType::NATIVE_UINT64, &queryIdx);
+
+    for (size_t j = 0; j < results.size(); ++j) {
+      const auto& tensor = results[j];
       auto data = tensor.data_ptr<float>();
-      file.write(reinterpret_cast<const char*>(data), tensor.numel() * sizeof(float));
+      hsize_t dims[1] = {tensor.numel()};
+
+      std::string datasetName = queryGroupName + HDF5_DATA_PREFIX + std::to_string(j);
+      H5::DataSpace dataspace(1, dims);
+      H5::DataSet dataset = file.createDataSet(datasetName, H5::PredType::NATIVE_FLOAT, dataspace);
+
+      dataset.write(data, H5::PredType::NATIVE_FLOAT);
     }
   }
-  file.close();
 
-  return true;
+  return metrics;
 }
 
 std::vector<torch::Tensor> CANDY::ConcurrentIndex::searchTensor(torch::Tensor &q, int64_t k) {

@@ -1,0 +1,104 @@
+/**
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+#include <cstdio>
+#include <cstdlib>
+#include <random>
+
+#include <omp.h>
+
+#include <gtest/gtest.h>
+
+#include <faiss/IndexFlat.h>
+#include <faiss/IndexXHS.h>
+#include <faiss/utils/distances.h>
+#include <faiss/utils/utils.h>
+
+namespace {
+
+// dimension of the vectors to index
+int d = 64;
+
+// size of the database we plan to index
+size_t nb = 8000;
+
+double eval_codec_error(long ncentroids, long m, const std::vector<float>& v) {
+    faiss::IndexFlatL2 coarse_quantizer(d);
+    faiss::IndexXHS index(&coarse_quantizer, d, ncentroids, m, 8);
+    index.pq.cp.niter = 10; // speed up train
+    index.train(nb, v.data());
+
+    // encode and decode to compute reconstruction error
+
+    std::vector<faiss::idx_t> keys(nb);
+    std::vector<uint8_t> codes(nb * m);
+    index.encode_multiple(nb, keys.data(), v.data(), codes.data(), true);
+
+    std::vector<float> v2(nb * d);
+    index.decode_multiple(nb, keys.data(), codes.data(), v2.data());
+
+    return faiss::fvec_L2sqr(v.data(), v2.data(), nb * d);
+}
+
+} // namespace
+
+bool runs_on_sandcastle() {
+    // see discussion here https://fburl.com/qc5kpdo2
+    const char* sandcastle = getenv("SANDCASTLE");
+    if (sandcastle && !strcmp(sandcastle, "1")) {
+        return true;
+    }
+    const char* tw_job_user = getenv("TW_JOB_USER");
+    if (tw_job_user && !strcmp(tw_job_user, "sandcastle")) {
+        return true;
+    }
+
+    return false;
+}
+
+TEST(IndexXHS, codec) {
+    // 维度
+    int d = 64;
+    // 数据库大小
+    size_t nb = 8000;
+
+    // 生成数据
+    std::vector<float> database(nb * d);
+    std::mt19937 rng;
+    std::uniform_real_distribution<> distrib;
+    for (size_t i = 0; i < nb * d; i++) {
+        database[i] = distrib(rng);
+    }
+
+    // 创建索引
+    faiss::IndexFlatL2 coarse_quantizer(d);
+    int ncentroids = 16;
+    int m = 8;
+    faiss::IndexXHS index(&coarse_quantizer, d, ncentroids, m, 8);
+
+    // 训练索引
+    index.train(nb, database.data());
+
+    // 进行编码
+    std::vector<faiss::idx_t> keys(nb);
+    std::vector<uint8_t> codes(nb * m);
+    index.encode_multiple(nb, keys.data(), database.data(), codes.data(), true);
+
+    // 进行解码
+    std::vector<float> decoded_data(nb * d);
+    index.decode_multiple(nb, keys.data(), codes.data(), decoded_data.data());
+
+    // 计算误差
+    double error = faiss::fvec_L2sqr(database.data(), decoded_data.data(), nb * d);
+
+    // 进行断言：较大的 ncentroids / m 应该减少误差
+    double error_large_ncentroids = eval_codec_error(128, 8, database);
+    double error_large_m = eval_codec_error(16, 16, database);
+
+    EXPECT_GT(error, error_large_ncentroids);
+    EXPECT_GT(error, error_large_m);
+}

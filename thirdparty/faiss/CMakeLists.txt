@@ -150,9 +150,9 @@ endif()
 # CTest must be included in the top level to enable `make test` target.
 include(CTest)
 if(BUILD_TESTING)
- # add_subdirectory(tests)
+  add_subdirectory(tests)
 
   if(FAISS_ENABLE_GPU)
-    #add_subdirectory(faiss/gpu/test)
+#    add_subdirectory(faiss/gpu/test)
   endif()
 endif()

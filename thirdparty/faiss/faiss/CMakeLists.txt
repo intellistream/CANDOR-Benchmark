@@ -37,6 +37,7 @@ set(FAISS_SRC
   IndexLattice.cpp
   IndexNSG.cpp
   IndexPQ.cpp
+  IndexXHS.cpp
   IndexFastScan.cpp
   IndexAdditiveQuantizerFastScan.cpp
   IndexIVFIndependentQuantizer.cpp
@@ -85,6 +86,7 @@ set(FAISS_SRC
   invlists/DirectMap.cpp
   invlists/InvertedLists.cpp
   invlists/InvertedListsIOHook.cpp
+  invlists/BlockInvertedListsXHS.cu
   utils/Heap.cpp
   utils/WorkerThread.cpp
   utils/distances.cpp
@@ -136,6 +138,7 @@ set(FAISS_HEADERS
   IndexNNDescent.h
   IndexNSG.h
   IndexPQ.h
+  IndexXHS.h
   IndexFastScan.h
   IndexAdditiveQuantizerFastScan.h
   IndexPQFastScan.h
@@ -191,6 +194,7 @@ set(FAISS_HEADERS
   invlists/DirectMap.h
   invlists/InvertedLists.h
   invlists/InvertedListsIOHook.h
+  invlists/BlockInvertedListsXHS.h
   utils/AlignedTable.h
   utils/Heap.h
   utils/WorkerThread.h
@@ -290,6 +294,19 @@ set_target_properties(faiss_avx512 PROPERTIES
   POSITION_INDEPENDENT_CODE ON
   WINDOWS_EXPORT_ALL_SYMBOLS ON
 )
+
+#find_package(CUDAToolkit REQUIRED)
+#enable_language(CUDA)
+#
+## 添加 CUDA 相关头文件目录
+#include_directories(${CUDAToolkit_INCLUDE_DIRS})
+#
+## 确保链接 CUDA 库
+#target_link_libraries(faiss PRIVATE ${CUDAToolkit_LIBRARIES})
+#target_link_libraries(faiss_avx2 PRIVATE ${CUDAToolkit_LIBRARIES})
+#target_link_libraries(faiss_avx512 PRIVATE ${CUDAToolkit_LIBRARIES})
+#set_source_files_properties(invlists/BlockInvertedListsXHS.cpp PROPERTIES LANGUAGE CUDA)
+
 
 if(WIN32)
   target_compile_definitions(faiss PRIVATE FAISS_MAIN_LIB)

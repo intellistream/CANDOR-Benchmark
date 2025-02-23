@@ -1,6 +1,6 @@
 
 cmake_minimum_required(VERSION 3.14)
-project(CANDYBENCH CXX)
+project(CANDYBENCH CXX C)
 include (cmake/FindCuda.cmake)
 include (cmake/FindTorch.cmake)
 find_package(Torch REQUIRED)
@@ -203,8 +203,6 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${DiskANN_BUILD_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${DiskANN_BUILD_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${DiskANN_BUILD_DIR}/lib)
 
-find_package(HDF5 REQUIRED COMPONENTS CXX)
-
 find_package(OpenMP REQUIRED)
 
 if (NOT ENABLE_DiskANN)
@@ -375,8 +373,8 @@ if(OpenMP_CXX_FOUND)
     target_link_libraries(CANDYBENCH PRIVATE OpenMP::OpenMP_CXX)
 endif()
 
+find_package(HDF5 REQUIRED COMPONENTS C)
 if (HDF5_FOUND)
-    message(STATUS "HDF5_INCLUDE_DIRS: ${HDF5_INCLUDE_DIRS}") # 添加此行
     include_directories(${HDF5_INCLUDE_DIRS})
     target_link_libraries(CANDYBENCH PRIVATE ${HDF5_LIBRARIES})
 else ()

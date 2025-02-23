@@ -11,7 +11,7 @@
 #include <time.h>
 #include <chrono>
 #include <assert.h>
-#include <H5Cpp.h>
+#include <hdf5.h>
 
 bool CANDY::ConcurrentIndex::setConfig(INTELLI::ConfigMapPtr cfg) {
   assert(cfg);
@@ -28,6 +28,7 @@ bool CANDY::ConcurrentIndex::setConfig(INTELLI::ConfigMapPtr cfg) {
   batchSize = cfg->tryI64("ccBatchSize", 100, true);
   numThreads = cfg->tryI64("ccNumThreads", 1, true);
   randomMode = cfg->tryI64("ccRandomMode", 1, false);
+  ccQuerySize = cfg->tryI64("ccQuerySize", 100, true);
 
   myIndexAlgo->setConfig(cfg);
   return true;
@@ -153,19 +154,30 @@ bool CANDY::ConcurrentIndex::ccInsertAndSearchTensor(torch::Tensor &t, torch::Te
   return true;
 }
 
-std::map<string, double> CANDY::ConcurrentIndex::ccSaveAndGetResults(std::string &outFile) {
-  std::map<string, double> metrics;
+std::map<std::string, double> CANDY::ConcurrentIndex::ccSaveAndGetResults(std::string& outFile) {
+  std::map<std::string, double> metrics;
   metrics["insertThroughput"] = insertThroughput;
   metrics["searchThroughput"] = searchThroughput;
 
   metrics["insertLatencyAvg"] = insertLatencyAvg;
   metrics["searchLatencyAvg"] = searchLatencyAvg;
-  
+
   metrics["insertLatency95"] = insertLatency95;
   metrics["searchLatency95"] = searchLatency95;
 
-  H5::H5File file(outFile, H5F_ACC_TRUNC);
-  H5::Group group = file.createGroup(HDF5_GROUP_NAME);
+  hid_t fileId, groupId, queryGroupId, dataspaceId, datasetId, attributeId;
+  herr_t status;
+
+  fileId = H5Fcreate(outFile.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+  if (fileId < 0) {
+    throw std::runtime_error("Failed to create HDF5 file: " + outFile);
+  }
+
+  groupId = H5Gcreate2(fileId, HDF5_GROUP_NAME, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+  if (groupId < 0) {
+    H5Fclose(fileId);
+    throw std::runtime_error("Failed to create HDF5 group: " + std::string(HDF5_GROUP_NAME));
+  }
 
   for (size_t i = 0; i < searchRes.size(); ++i) {
     const auto& rec = searchRes[i];
@@ -173,26 +185,47 @@ std::map<string, double> CANDY::ConcurrentIndex::ccSaveAndGetResults(std::string
     uint64_t queryIdx = std::get<1>(rec);
     const auto& results = std::get<2>(rec);
 
-    std::string queryGroupName = HDF5_QUERY_GROUP_PREFIX + std::to_string(i);
-    H5::Group queryGroup = group.createGroup(queryGroupName);
+    std::string queryGroupName = std::string(HDF5_QUERY_GROUP_PREFIX) + std::to_string(i);
 
-    queryGroup.createAttribute(HDF5_STEP_NAME, H5::PredType::NATIVE_UINT64, H5::DataSpace(H5S_SCALAR))
-      .write(H5::PredType::NATIVE_UINT64, &step);
-    queryGroup.createAttribute(HDF5_QUERY_IDX_NAME, H5::PredType::NATIVE_UINT64, H5::DataSpace(H5S_SCALAR))
-      .write(H5::PredType::NATIVE_UINT64, &queryIdx);
+    queryGroupId = H5Gcreate2(groupId, queryGroupName.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    if (queryGroupId < 0) {
+      H5Gclose(groupId);
+      H5Fclose(fileId);
+      throw std::runtime_error("Failed to create query group: " + queryGroupName);
+    }
+
+    dataspaceId = H5Screate(H5S_SCALAR);
+    attributeId = H5Acreate2(queryGroupId, HDF5_STEP_NAME, H5T_NATIVE_UINT64, dataspaceId, H5P_DEFAULT, H5P_DEFAULT);
+    status = H5Awrite(attributeId, H5T_NATIVE_UINT64, &step);
+    H5Aclose(attributeId);
+    H5Sclose(dataspaceId);
+
+    dataspaceId = H5Screate(H5S_SCALAR);
+    attributeId = H5Acreate2(queryGroupId, HDF5_QUERY_IDX_NAME, H5T_NATIVE_UINT64, dataspaceId, H5P_DEFAULT, H5P_DEFAULT);
+    status = H5Awrite(attributeId, H5T_NATIVE_UINT64, &queryIdx);
+    H5Aclose(attributeId);
+    H5Sclose(dataspaceId);
 
     for (size_t j = 0; j < results.size(); ++j) {
       const auto& tensor = results[j];
-      auto data = tensor.data_ptr<float>();
+      float* data = tensor.data_ptr<float>();
       hsize_t dims[1] = {tensor.numel()};
 
-      std::string datasetName = queryGroupName + HDF5_DATA_PREFIX + std::to_string(j);
-      H5::DataSpace dataspace(1, dims);
-      H5::DataSet dataset = file.createDataSet(datasetName, H5::PredType::NATIVE_FLOAT, dataspace);
+      std::string datasetName = queryGroupName + std::string(HDF5_DATA_PREFIX) + std::to_string(j);
 
-      dataset.write(data, H5::PredType::NATIVE_FLOAT);
+      dataspaceId = H5Screate_simple(1, dims, nullptr);
+      datasetId = H5Dcreate2(fileId, datasetName.c_str(), H5T_NATIVE_FLOAT, dataspaceId, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      status = H5Dwrite(datasetId, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
+
+      H5Dclose(datasetId);
+      H5Sclose(dataspaceId);
     }
+    H5Gclose(queryGroupId);
   }
+  H5Gclose(groupId);
+  H5Fclose(fileId);
+
+  std::cout << "Concurrent search results saved: " << outFile <<std::endl;
 
   return metrics;
 }

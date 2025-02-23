@@ -41,6 +41,7 @@ class ConcurrentIndex : public CANDY::AbstractIndex {
   int64_t batchSize = 0;
   int64_t initSize = 0;
   int64_t randomMode = true;
+  int64_t ccQuerySize = 0;
 
   double insertThroughput = 0.0;
   double searchThroughput = 0.0;

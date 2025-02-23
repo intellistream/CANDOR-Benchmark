@@ -49,18 +49,35 @@ template <class T> T *aligned_malloc(const size_t n, const size_t alignment) {
 }
 
 template <typename T>
-inline void loadBinAsFloat(const char *filename, float *&data, size_t &npts, size_t &ndims, int partNum) {
+inline void loadBinAsFloat(const char *filename, float *&data, size_t &npts, size_t &ndims, int partNum, int64_t x = -1) {
   std::ifstream reader;
   reader.exceptions(std::ios::failbit | std::ios::badbit);
   reader.open(filename, std::ios::binary);
   std::cout << "Reading bin file " << filename << " ...\n";
+
   int nptsI32, ndimsI32;
   reader.read((char *)&nptsI32, sizeof(int));
   reader.read((char *)&ndimsI32, sizeof(int));
-  uint64_t startId = partNum * PARTSIZE;
-  uint64_t endId = (std::min)(startId + PARTSIZE, (uint64_t)nptsI32);
+
+  uint64_t startId, endId;
+  if (x == -1) {
+    startId = partNum * PARTSIZE;
+    endId = (std::min)(startId + PARTSIZE, (uint64_t)nptsI32);
+  } else {
+    startId = partNum * PARTSIZE;
+    endId = (std::min)(startId + static_cast<uint64_t>(x), (uint64_t)nptsI32);
+  }
   npts = endId - startId;
   ndims = (uint64_t)ndimsI32;
+
+  if (startId >= (uint64_t)nptsI32) {
+    std::cout << "Part " << partNum << " is out of range. No data loaded.\n";
+    npts = 0;
+    data = nullptr;
+    reader.close();
+    return;
+  }
+
   std::cout << "#pts in part = " << npts << ", #dims = " << ndims << ", size = " << npts * ndims * sizeof(T) << "B"
             << std::endl;
 
@@ -69,6 +86,7 @@ inline void loadBinAsFloat(const char *filename, float *&data, size_t &npts, siz
   reader.read((char *)dataT, sizeof(T) * npts * ndims);
   std::cout << "Finished reading part of the bin file." << std::endl;
   reader.close();
+
   data = aligned_malloc<float>(npts * ndims, ALIGNMENT);
 #pragma omp parallel for schedule(dynamic, 32768)
   for (int64_t i = 0; i < (int64_t)npts; i++) {

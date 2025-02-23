@@ -32,7 +32,6 @@ bool CANDY::NSWlibIndex::insertTensor(torch::Tensor &t) {
   if (!index) throw std::runtime_error("NSWlib_HNSW not initialized");
   auto vec = t.to(torch::kCPU).contiguous();
   int64_t curCnt = count.fetch_add(1, std::memory_order_relaxed);
-  std::cout << "inserting " << curCnt << std::endl;
   index->addPoint(vec.data_ptr<float>(), curCnt);
   return true;
 }

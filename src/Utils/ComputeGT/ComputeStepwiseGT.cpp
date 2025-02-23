@@ -5,8 +5,10 @@
  *  Description:
  */
 
-#include <Utils/ComputeGT/ComputeStepwiseGT.hpp>
+#include <hdf5.h>
+
 #include <Utils/ComputeGT/ComputeGT.hpp>
+#include <Utils/ComputeGT/ComputeStepwiseGT.hpp>
 
 void COMPUTE_GT::computeStepwiseGT(const std::string& baseFile, const std::string& queryFile,
                                     const std::string& gtFile, size_t k, 
@@ -38,60 +40,73 @@ void COMPUTE_GT::computeStepwiseGT(const std::string& baseFile, const std::strin
   size_t nqueries;
   loadBinAsFloat<float>(queryFile.c_str(), queryData, nqueries, dim, 0, qSize);
 
-  float* gtVectors = new float[nqueries * dim];
   size_t* closestPoints = new size_t[nqueries * k];
   float* distClosestPoints = new float[nqueries * k];
 
   size_t currentPoints = initialCount;
   size_t step = 0;
 
-  std::ofstream writer(gtFile, std::ios::binary);
-  if (!writer) {
-    std::cerr << "Error opening file: " << gtFile << std::endl;
-    delete[] baseData;
-    delete[] queryData;
-    delete[] gtVectors;
-    delete[] closestPoints;
-    delete[] distClosestPoints;
-    return;
+  hid_t fileId = H5Fcreate(gtFile.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+  if (fileId < 0) {
+    throw std::runtime_error("Failed to create HDF5 file: " + gtFile);
   }
 
-  std::vector<char> buffer;
-  buffer.reserve(nqueries * dim * sizeof(float) + 3 * sizeof(uint64_t));
+  hid_t rootGroupId = H5Gcreate2(fileId, "/groundtruth", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+  if (rootGroupId < 0) {
+    H5Fclose(fileId);
+    throw std::runtime_error("Failed to create HDF5 group: /groundtruth");
+  }
 
   while (currentPoints < npoints) {
     size_t nextStepPoints = currentPoints + batchSize > npoints ? npoints : currentPoints + batchSize;
     size_t insertCount = nextStepPoints - currentPoints;
     currentPoints = nextStepPoints;
-    step++;
+
+    std::string batchGroupName = "batch_" + std::to_string(step);
+    hid_t batchGroupId = H5Gcreate2(rootGroupId, batchGroupName.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    if (batchGroupId < 0) {
+      H5Gclose(rootGroupId);
+      H5Fclose(fileId);
+      throw std::runtime_error("Failed to create batch group: " + batchGroupName);
+    }
 
     exactKnn(dim, k, closestPoints, distClosestPoints, currentPoints, baseData, nqueries, queryData, metric);
 
-#pragma omp parallel for if(nqueries > 1000)
     for (size_t i = 0; i < nqueries; i++) {
-      size_t gtIdx = closestPoints[i * k];
-      std::memcpy(gtVectors + i * dim, baseData + gtIdx * dim, dim * sizeof(float));
+      std::string queryIdxName = std::to_string(i);
+      hid_t queryGroupId = H5Gcreate2(batchGroupId, queryIdxName.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      if (queryGroupId < 0) {
+        H5Gclose(batchGroupId);
+        H5Gclose(rootGroupId);
+        H5Fclose(fileId);
+        throw std::runtime_error("Failed to create query group: " + queryIdxName);
+      }
+
+      hsize_t dims[1] = {dim};
+      for (size_t j = 0; j < k; j++) {
+        size_t gtIdx = closestPoints[i * k + j];
+        std::string datasetName = "tensor_" + std::to_string(j);
+        hid_t dataspaceId = H5Screate_simple(1, dims, nullptr);
+        hid_t datasetId = H5Dcreate2(queryGroupId, datasetName.c_str(), H5T_NATIVE_FLOAT, dataspaceId, 
+                                      H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+        herr_t status = H5Dwrite(datasetId, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, baseData + gtIdx * dim);
+        if (status < 0) throw std::runtime_error("Failed to write dataset " + datasetName);
+
+        H5Dclose(datasetId);
+        H5Sclose(dataspaceId);
+      }
+      H5Gclose(queryGroupId);
     }
-
-    buffer.clear();
-    uint64_t step64 = static_cast<uint64_t>(step);
-    buffer.insert(buffer.end(), reinterpret_cast<char*>(&step64), reinterpret_cast<char*>(&step64) + sizeof(step64));
-    buffer.insert(buffer.end(), reinterpret_cast<char*>(&insertCount), reinterpret_cast<char*>(&insertCount) + sizeof(insertCount));
-    buffer.insert(buffer.end(), reinterpret_cast<char*>(&dim), reinterpret_cast<char*>(&dim) + sizeof(dim));
-
-    for (size_t i = 0; i < nqueries; i++) 
-      buffer.insert(buffer.end(), reinterpret_cast<char*>(&i), reinterpret_cast<char*>(&i) + sizeof(i));
-    buffer.insert(buffer.end(), reinterpret_cast<char*>(gtVectors), reinterpret_cast<char*>(gtVectors) + nqueries * dim * sizeof(float));   
-    writer.write(buffer.data(), buffer.size());
-
+    H5Gclose(batchGroupId);
     std::cout << "Step " << step << " completed. Inserted " << insertCount 
               << " vectors. Total: " << currentPoints << std::endl;
+    step++;
   }
+  H5Gclose(rootGroupId);
+  H5Fclose(fileId);
 
-  writer.close();
   delete[] baseData;
   delete[] queryData;
-  delete[] gtVectors;
   delete[] closestPoints;
   delete[] distClosestPoints;
 }

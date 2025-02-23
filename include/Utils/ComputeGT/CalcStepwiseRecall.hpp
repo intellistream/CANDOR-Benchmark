@@ -9,26 +9,25 @@
 #define UTILS_COMPUTE_GT_CALC_STEPWISE_RECALL_HPP
 
 #include <string>
+#include <map>
 #include <vector>
 #include <cstdint>
 
 namespace COMPUTE_GT {
 
-struct StepRecall {
-  uint64_t step;        
-  double recall;       
-};
-
-bool readStepwiseFile(const std::string& filename, uint64_t& npts, uint64_t& ndims, 
-                        std::vector<size_t>* indices, std::vector<std::vector<float>>& data, 
-                        bool readIndices);
+std::map<uint64_t, std::vector<std::pair<size_t, std::vector<std::vector<float>>>>> 
+  readStepwiseHDF5(const std::string& filename, const std::string& groupName);
 
 double calcRecallWithQueryVec(const std::vector<std::vector<float>>& queryVectors,
                                 const std::vector<std::vector<float>>& annsResult,
-                                const std::vector<std::vector<float>>& gtVectors);
+                                const std::vector<std::vector<float>>& gtVectors,
+                                float threshold = 1e-6);
 
-void calcStepwiseRecall(const std::string& annsFile, const std::string& gtFile, 
-                          const std::string& outFile);
+std::vector<std::pair<size_t, double>> calcStepwiseRecall(const std::string& annsFile, 
+                                                            const std::string& gtFile);
+
+float computeL2Distance(const std::vector<float>& v1, const std::vector<float>& v2);
+
 } 
 
 #endif // UTILS_COMPUTE_GT_CALC_STEPWISE_RECALL_HPP

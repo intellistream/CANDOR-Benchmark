@@ -1,109 +1,162 @@
 #include <Utils/ComputeGT/CalcStepwiseRecall.hpp>
 
-#include <iostream>
-#include <fstream>
-#include <vector>
-#include <set>
-#include <map>
 #include <algorithm>
-#include <cstring>
 #include <cmath>
 #include <cstdint>
+#include <cstring>
 #include <ctime>
+#include <fstream>
+#include <hdf5.h>
+#include <iostream>
 
-bool COMPUTE_GT::readStepwiseFile(const std::string& filename, uint64_t& npts, uint64_t& ndims, 
-                                    std::vector<size_t>* indices, std::vector<std::vector<float>>& data, 
-                                    bool readIndices) {
-  std::ifstream file(filename, std::ios::binary);
-  if (!file) {
-    std::cerr << "Error opening file: " << filename << std::endl;
-    return false;
+std::map<uint64_t, std::vector<std::pair<size_t, std::vector<std::vector<float>>>>> 
+    COMPUTE_GT::readStepwiseHDF5(const std::string& filename, const std::string& groupName) {
+  std::map<uint64_t, std::vector<std::pair<size_t, std::vector<std::vector<float>>>>> result;
+
+  hid_t fileId = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+  if (fileId < 0) {
+    std::cerr << "Error opening HDF5 file: " << filename << std::endl;
+    return result;
   }
 
-  if (!file.read(reinterpret_cast<char*>(&npts), sizeof(uint64_t))) return false;
-  if (!file.read(reinterpret_cast<char*>(&ndims), sizeof(uint64_t))) return false;
+  hid_t groupId = H5Gopen2(fileId, groupName.c_str(), H5P_DEFAULT);
+  if (groupId < 0) {
+    std::cerr << "Error opening group: " << groupName << std::endl;
+    H5Fclose(fileId);
+    return result;
+  }
 
-  if (readIndices && indices) {
-    indices->resize(npts);
-    for (size_t i = 0; i < npts; i++) {
-      if (!file.read(reinterpret_cast<char*>(&(*indices)[i]), sizeof(size_t))) return false;
+  hsize_t numObjects;
+  H5Gget_num_objs(groupId, &numObjects);
+  for (hsize_t i = 0; i < numObjects; i++) {
+    char batchName[32];
+    H5Gget_objname_by_idx(groupId, i, batchName, sizeof(batchName));
+    std::string batchGroupName = std::string(batchName);
+    hid_t batchGroupId = H5Gopen2(groupId, batchGroupName.c_str(), H5P_DEFAULT);
+    if (batchGroupId < 0) {
+      std::cerr << "Error opening batch group: " << batchGroupName << std::endl;
+      continue;
     }
-  }
 
-  data.resize(npts, std::vector<float>(ndims));
-  for (size_t i = 0; i < npts; i++) {
-    if (!file.read(reinterpret_cast<char*>(data[i].data()), ndims * sizeof(float))) return false;
-  }
+    uint64_t step = std::stoul(batchGroupName.substr(6)); 
 
-  return true;
+    hsize_t numQueries;
+    H5Gget_num_objs(batchGroupId, &numQueries);
+    for (hsize_t q = 0; q < numQueries; q++) {
+      char queryName[32];
+      H5Gget_objname_by_idx(batchGroupId, q, queryName, sizeof(queryName));
+      std::string queryGroupName = std::string(queryName);
+      hid_t queryGroupId = H5Gopen2(batchGroupId, queryGroupName.c_str(), H5P_DEFAULT);
+      if (queryGroupId < 0) {
+        std::cerr << "Error opening query group: " << queryGroupName << std::endl;
+        continue;
+      }
+
+      std::cout << "queryGroupName " << queryGroupName << std::endl;
+      size_t queryIdx = std::stoul(queryGroupName.substr(6)); 
+
+      std::vector<std::vector<float>> tensors;
+      for (size_t j = 0; ; j++) {
+        std::string dsName = "tensor_" + std::to_string(j);
+        hid_t datasetId = H5Dopen2(queryGroupId, dsName.c_str(), H5P_DEFAULT);
+        if (datasetId < 0) break;
+        hid_t dataspaceId = H5Dget_space(datasetId);
+        hsize_t dims[1];
+        H5Sget_simple_extent_dims(dataspaceId, dims, NULL);
+        std::vector<float> vec(dims[0]);
+        H5Dread(datasetId, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, vec.data());
+        tensors.push_back(std::move(vec));
+        H5Sclose(dataspaceId);
+        H5Dclose(datasetId);
+      }
+      result[step].emplace_back(queryIdx, std::move(tensors));
+      H5Gclose(queryGroupId);
+    }
+    H5Gclose(batchGroupId);
+  }
+  H5Gclose(groupId);
+  H5Fclose(fileId);
+  return result;
 }
 
-double COMPUTE_GT::calcRecallWithQueryVec(const std::vector<std::vector<float>>& queryVectors,
-                                            const std::vector<std::vector<float>>& annsResult,
-                                            const std::vector<std::vector<float>>& gtVectors) {
+float COMPUTE_GT::computeL2Distance(const std::vector<float> &v1,
+                                      const std::vector<float> &v2) {
+  if (v1.size() != v2.size())
+    return std::numeric_limits<float>::max();
+  float sum = 0.0;
+  for (size_t i = 0; i < v1.size(); i++) {
+    float diff = v1[i] - v2[i];
+    sum += diff * diff;
+  }
+  return std::sqrt(sum);
+}
+
+double
+COMPUTE_GT::calcRecallWithQueryVec(const std::vector<std::vector<float>> &queryVectors,
+                                    const std::vector<std::vector<float>> &annsResult,
+                                    const std::vector<std::vector<float>> &gtVectors,
+                                    float threshold) {
   if (queryVectors.empty() || annsResult.empty() || gtVectors.empty()) {
     std::cerr << "Error: Input vectors cannot be empty." << std::endl;
     return 0.0;
   }
 
-  size_t nqueries = queryVectors.size();
-  size_t ndims = annsResult[0].size();
   size_t correct_count = 0;
+  size_t total_count = annsResult.size();
 
-  std::map<std::vector<float>, size_t> gtIndexMap;
-  for (size_t i = 0; i < gtVectors.size(); ++i) {
-    gtIndexMap[gtVectors[i]] = i;
-  }
-
-  for (size_t i = 0; i < nqueries; i++) {
-    auto it = gtIndexMap.find(queryVectors[i]);
-    if (it == gtIndexMap.end()) {
-      std::cerr << "Warning: Query vector not found in GT file." << std::endl;
+  for (size_t i = 0; i < queryVectors.size(); i++) {
+    bool queryFound = false;
+    size_t gtIndex = 0;
+    for (size_t j = 0; j < gtVectors.size(); j++) {
+      if (computeL2Distance(queryVectors[i], gtVectors[j]) < threshold) {
+        queryFound = true;
+        gtIndex = j;
+        break;
+      }
+    }
+    if (!queryFound) {
+      std::cerr << "Warning: Query vector not found in GT." << std::endl;
       continue;
     }
-    size_t gtIndex = it->second;
 
-    std::set<int> gtSet;
-    for (const auto& val : gtVectors[gtIndex]) {
-      gtSet.insert(static_cast<int>(val));
-    }
-
-    for (float val : annsResult[i]) {
-      int predictedId = static_cast<int>(val);
-      if (gtSet.find(predictedId) != gtSet.end()) {
+    for (const auto &annVec : annsResult) {
+      if (computeL2Distance(annVec, gtVectors[gtIndex]) < threshold) {
         correct_count++;
       }
     }
   }
-
-  return static_cast<double>(correct_count) / (nqueries * ndims);
+  return static_cast<double>(correct_count) / total_count;
 }
 
-void COMPUTE_GT::calcStepwiseRecall(const std::string& annsFile, 
-                                      const std::string& gtFile, 
-                                      const std::string& outFile) {
-  uint64_t npts, ndims;
-  std::vector<std::vector<float>> gtVectors;
-  if (!readStepwiseFile(gtFile, npts, ndims, nullptr, gtVectors, false)) {
-    std::cerr << "Failed to read ground truth file." << std::endl;
-    return;
-  }
+std::vector<std::pair<size_t, double>>
+COMPUTE_GT::calcStepwiseRecall(const std::string &annsFile, const std::string &gtFile) {
+  auto gtData = readStepwiseHDF5(gtFile, "/groundtruth");
+  auto annData = readStepwiseHDF5(annsFile, "/search_results");
 
-  uint64_t step, batchNpts, batchNdims;
-  std::vector<size_t> queryIndices;
-  std::vector<std::vector<float>> annsResult;
+  std::vector<std::pair<size_t, double>> stepwiseRecall;
 
-  while (readStepwiseFile(annsFile, batchNpts, batchNdims, &queryIndices, annsResult, true)) {
-    double recall = calcRecallWithQueryVec(gtVectors, annsResult, gtVectors);
-    std::ofstream file(outFile, std::ios::app);
-    if (!file) {
-      std::cerr << "Failed to open output file." << std::endl;
-      return;
+  for (const auto &[step, annQueries] : annData) {
+    double totalRecall = 0.0;
+    size_t queryCount = 0;
+
+    for (const auto &[annQueryIdx, annVectors] : annQueries) {
+      auto gtIt = gtData.find(step);
+      if (gtIt != gtData.end()) {
+        for (const auto &[gtQueryIdx, gtVectors] : gtIt->second) {
+          if (annQueryIdx == gtQueryIdx) {
+            double recall = calcRecallWithQueryVec(gtVectors, annVectors, gtVectors);
+            totalRecall += recall;
+            queryCount++;
+            break;
+          }
+        }
+      }
     }
-    file << "Step " << step << ": Recall = " << recall << std::endl;
-    std::cout << "Step " << step << ": Recall = " << recall << std::endl;
-    file.close();
-  }
 
-  std::cout << "Stepwise recall written to " << outFile << std::endl;
+    if (queryCount > 0) {
+      double avgRecall = totalRecall / queryCount;
+      stepwiseRecall.emplace_back(static_cast<size_t>(step), avgRecall);
+    }
+  }
+  return stepwiseRecall;
 }

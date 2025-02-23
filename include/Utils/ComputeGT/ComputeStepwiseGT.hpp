@@ -23,8 +23,8 @@
 namespace COMPUTE_GT {
 
 void computeStepwiseGT(const std::string& baseFile, const std::string& queryFile,
-                          const std::string& gtFile, size_t k, const std::string& distFn,
-                          size_t batchSize, size_t initSize, size_t qSize);
+                        const std::string& gtFile, size_t k, const std::string& distFn,
+                        size_t batchSize, size_t initSize, size_t qSize);
 }
 
 #endif // UTILS_COMPUTE_GT_COMPUTE_STEPWISE_GT_HPP

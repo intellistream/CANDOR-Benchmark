@@ -45,9 +45,6 @@ std::vector<torch::Tensor> CANDY::NSWlibIndex::searchTensor(torch::Tensor &qt, i
   int64_t rows = isBatch ? q.size(0) : 1;
   std::vector<torch::Tensor> resT(rows);
 
-  if (isBatch)
-    std::cout << "BATCH !" << std::endl;
-
   for (int64_t i = 0; i < rows; i++) {
     torch::Tensor query;
     if (isBatch) 

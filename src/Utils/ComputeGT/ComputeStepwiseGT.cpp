@@ -57,12 +57,20 @@ void COMPUTE_GT::computeStepwiseGT(const std::string& baseFile, const std::strin
     throw std::runtime_error("Failed to create HDF5 group: /groundtruth");
   }
 
+  hid_t attrDatatype = H5Tcopy(H5T_NATIVE_HSIZE);
+  hid_t attrDataspace = H5Screate(H5S_SCALAR);
+  hid_t attrId = H5Acreate2(rootGroupId, "k", attrDatatype, attrDataspace, H5P_DEFAULT, H5P_DEFAULT);
+  H5Awrite(attrId, H5T_NATIVE_HSIZE, &k);
+  H5Aclose(attrId);
+  H5Sclose(attrDataspace);
+  H5Tclose(attrDatatype);
+
   while (currentPoints < npoints) {
     size_t nextStepPoints = currentPoints + batchSize > npoints ? npoints : currentPoints + batchSize;
     size_t insertCount = nextStepPoints - currentPoints;
     currentPoints = nextStepPoints;
 
-    std::string batchGroupName = "batch_" + std::to_string(step);
+    std::string batchGroupName = "batch_" + std::to_string(currentPoints);
     hid_t batchGroupId = H5Gcreate2(rootGroupId, batchGroupName.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     if (batchGroupId < 0) {
       H5Gclose(rootGroupId);
@@ -73,7 +81,7 @@ void COMPUTE_GT::computeStepwiseGT(const std::string& baseFile, const std::strin
     exactKnn(dim, k, closestPoints, distClosestPoints, currentPoints, baseData, nqueries, queryData, metric);
 
     for (size_t i = 0; i < nqueries; i++) {
-      std::string queryIdxName = std::to_string(i);
+      std::string queryIdxName = "query_" + std::to_string(i);
       hid_t queryGroupId = H5Gcreate2(batchGroupId, queryIdxName.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
       if (queryGroupId < 0) {
         H5Gclose(batchGroupId);
@@ -98,9 +106,7 @@ void COMPUTE_GT::computeStepwiseGT(const std::string& baseFile, const std::strin
       H5Gclose(queryGroupId);
     }
     H5Gclose(batchGroupId);
-    std::cout << "Step " << step << " completed. Inserted " << insertCount 
-              << " vectors. Total: " << currentPoints << std::endl;
-    step++;
+    std::cout << "Batch " << currentPoints << " completed. Inserted " << insertCount << " vectors." << std::endl;
   }
   H5Gclose(rootGroupId);
   H5Fclose(fileId);

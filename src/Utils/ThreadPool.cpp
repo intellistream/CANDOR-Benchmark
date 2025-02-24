@@ -56,4 +56,8 @@ void INTELLI::ThreadPool::waitForTasks() {
   finishCondition.wait(lock, [this] { return tasks.empty() && activeTasks == 0; });
 }
 
+std::thread::id INTELLI::ThreadPool::getCurrentThreadId() const {
+  return std::this_thread::get_id();
+}
+
 }

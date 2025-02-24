@@ -10,6 +10,8 @@
 #include <Utils/ThreadPool.hpp>
 #include <time.h>
 #include <chrono>
+#include <set>
+#include <cmath>
 #include <assert.h>
 #include <hdf5.h>
 
@@ -46,31 +48,24 @@ bool CANDY::ConcurrentIndex::ccInsertAndSearchTensor(torch::Tensor &t, torch::Te
     return false;
   }
 
-  // 计算插入和搜索任务的数量
+  ANNK = k;
+  
   size_t insertTotal = t.size(0);
   size_t searchTotal = insertTotal * ((1 - writeRatio) / writeRatio);
   size_t qtSize = qt.size(0);
   size_t searchBatchSize = batchSize * ((1 - writeRatio) / writeRatio);
 
-  // 定义任务索引和计数器
   std::atomic<size_t> nextInsertIdx = 0, nextSearchIdx = 0;
   std::atomic<size_t> completedInserts = 0, completedSearches = 0;
 
-  // 异常处理和互斥锁
   std::exception_ptr lastException = nullptr;
   std::mutex lastExceptMutex, resultMutex, insertLatencyMutex, searchLatencyMutex;
 
-  // 定义共享的延迟容器
   std::vector<double> insertLatencies, searchLatencies;
 
-  // 创建线程池
   INTELLI::ThreadPool pool(numThreads);
 
-  // 定义线程局部的搜索结果缓冲区
-  thread_local std::vector<SearchRecord> localSearchBuffer;
-
   auto startTime = std::chrono::high_resolution_clock::now();
-
   while (nextInsertIdx < insertTotal || nextSearchIdx < searchTotal) {
     size_t startInsert = nextInsertIdx.fetch_add(batchSize);
     size_t endInsert = std::min(startInsert + batchSize, insertTotal);
@@ -103,13 +98,13 @@ bool CANDY::ConcurrentIndex::ccInsertAndSearchTensor(torch::Tensor &t, torch::Te
     size_t batchEnd = initialSize + (batchIdx + 1) * searchBatchSize;
 
     for (size_t idx = startSearch; idx < endSearch; ++idx) {
-      pool.enqueueTask([&, idx] {
+      pool.enqueueTask([&, idx, batchEnd] {
         auto taskStart = std::chrono::high_resolution_clock::now();
         try {
           size_t queryIdx = randomMode ? (std::rand() % qtSize) : (idx % qtSize);
           auto q = qt[queryIdx];
-          auto res = myIndexAlgo->searchTensor(q, k);
-          completedSearches.fetch_add(1);
+          auto res = myIndexAlgo->searchTensor(q, k)[0];
+          completedSearches.fetch_add(1); 
 
           auto taskEnd = std::chrono::high_resolution_clock::now();
           double latency = std::chrono::duration<double, std::milli>(taskEnd - taskStart).count();
@@ -117,8 +112,10 @@ bool CANDY::ConcurrentIndex::ccInsertAndSearchTensor(torch::Tensor &t, torch::Te
             std::unique_lock<std::mutex> lock(searchLatencyMutex);
             searchLatencies.push_back(latency);
           }
-
-          localSearchBuffer.emplace_back(batchEnd, queryIdx, res);
+          {
+            std::unique_lock<std::mutex> lock(resultMutex);
+            searchRes.emplace_back(batchEnd, queryIdx, res);
+          }
         } catch (...) {
           std::unique_lock<std::mutex> lock(lastExceptMutex);
           lastException = std::current_exception();
@@ -133,19 +130,6 @@ bool CANDY::ConcurrentIndex::ccInsertAndSearchTensor(torch::Tensor &t, torch::Te
 
   insertThroughput = completedInserts / elapsedSec;
   searchThroughput = completedSearches / elapsedSec;
-
-  for (int i = 0; i < numThreads; ++i) {
-    pool.enqueueTask([&]() {
-      std::unique_lock<std::mutex> lock(resultMutex);
-      searchRes.insert(searchRes.end(), localSearchBuffer.begin(), localSearchBuffer.end());
-      localSearchBuffer.clear();
-    });
-  }
-
-  pool.waitForTasks(); 
-
-  std::cout << "================= SEARCH TOTAL " << completedSearches.load() << std::endl;
-  std::cout << "================= SEARCH RES SIZE " << searchRes.size() << std::endl;
 
   if (lastException) {
     std::rethrow_exception(lastException);
@@ -174,72 +158,102 @@ bool CANDY::ConcurrentIndex::ccInsertAndSearchTensor(torch::Tensor &t, torch::Te
 
 std::map<std::string, double> CANDY::ConcurrentIndex::ccSaveAndGetResults(std::string& outFile) {
   std::map<std::string, double> metrics;
-  metrics["insertThroughput"] = insertThroughput;
-  metrics["searchThroughput"] = searchThroughput;
-  metrics["insertLatencyAvg"] = insertLatencyAvg;
-  metrics["searchLatencyAvg"] = searchLatencyAvg;
-  metrics["insertLatency95"] = insertLatency95;
-  metrics["searchLatency95"] = searchLatency95;
+  metrics["insertThroughput"] = int(insertThroughput);
+  metrics["searchThroughput"] = int(searchThroughput);
+  metrics["insertLatencyAvg"] = std::round(insertLatencyAvg * 10000) / 10000.0;
+  metrics["searchLatencyAvg"] = std::round(searchLatencyAvg * 10000) / 10000.0;
+  metrics["insertLatency95"] = std::round(insertLatency95 * 10000) / 10000.0;
+  metrics["searchLatency95"] = std::round(searchLatency95 * 10000) / 10000.0;
 
-  hid_t fileId, groupId, batchGroupId, queryGroupId, dataspaceId, datasetId;
+  hid_t fileId = -1, groupId = -1, batchGroupId = -1, queryGroupId = -1, dataspaceId, datasetId;
   herr_t status;
 
-  std::cout << "SEARCH RES SIZE " << searchRes.size() << std::endl;
+  if (searchRes.empty()) 
+    return metrics;
 
   fileId = H5Fcreate(outFile.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
   if (fileId < 0) {
-    throw std::runtime_error("Failed to create HDF5 file: " + outFile);
+    std::cerr << "Failed to create HDF5 file: " << outFile << std::endl;
+    return metrics;
   }
 
+  // std::cout << "Creating group: /search_results" << std::endl;
   groupId = H5Gcreate2(fileId, "/search_results", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
   if (groupId < 0) {
+    std::cerr << "Failed to create HDF5 group: /search_results" << std::endl;
     H5Fclose(fileId);
-    throw std::runtime_error("Failed to create HDF5 group: /search_results");
+    return metrics;
   }
 
-  std::map<BatchIndex, std::vector<std::pair<QueryIndex, SearchResults>>> groupedResults;
+  hid_t attrDatatype = H5Tcopy(H5T_NATIVE_HSIZE);
+  hid_t attrDataspace = H5Screate(H5S_SCALAR);
+  hid_t attrId = H5Acreate2(groupId, "k", attrDatatype, attrDataspace, H5P_DEFAULT, H5P_DEFAULT);
+  H5Awrite(attrId, H5T_NATIVE_HSIZE, &ANNK);
+  H5Aclose(attrId);
+  H5Sclose(attrDataspace);
+  H5Tclose(attrDatatype);
+
+  std::map<BatchIndex, std::vector<std::pair<QueryIndex, torch::Tensor>>> groupedResults;
   for (const auto& rec : searchRes) {
-    BatchIndex step = std::get<0>(rec); 
-    QueryIndex queryIdx = std::get<1>(rec);  
-    const SearchResults& results = std::get<2>(rec);  
-    groupedResults[step].emplace_back(queryIdx, results);
+    BatchIndex step = std::get<0>(rec);
+    QueryIndex queryIdx = std::get<1>(rec);
+    auto t = std::get<2>(rec);
+    groupedResults[step].emplace_back(queryIdx, t);
   }
 
   for (const auto& [step, queries] : groupedResults) {
     std::string batchGroupName = "batch_" + std::to_string(step);
-    std::cout << "Creating batch group: " << batchGroupName << std::endl;
+    // std::cout << "Creating batch group: " << batchGroupName << std::endl;
     batchGroupId = H5Gcreate2(groupId, batchGroupName.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     if (batchGroupId < 0) {
+      std::cerr << "Failed to create batch group: " << batchGroupName << std::endl;
       H5Gclose(groupId);
       H5Fclose(fileId);
-      throw std::runtime_error("Failed to create batch group: " + batchGroupName);
+      return metrics;
     }
 
-    for (const auto& [queryIdx, results] : queries) {
+    std::set<QueryIndex> seenQueryIdx;
+    for (const auto& [queryIdx, t] : queries) {
       std::string queryGroupName = "query_" + std::to_string(queryIdx);
-      std::cout << "Attempting to create query group: " << queryGroupName << " under " << batchGroupName << std::endl;
+      if (seenQueryIdx.count(queryIdx) > 0) continue;
+      seenQueryIdx.insert(queryIdx);
+
       queryGroupId = H5Gcreate2(batchGroupId, queryGroupName.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
       if (queryGroupId < 0) {
+        std::cerr << "Failed to create query group: " << queryGroupName << std::endl;
         H5Gclose(batchGroupId);
         H5Gclose(groupId);
         H5Fclose(fileId);
-        throw std::runtime_error("Failed to create query group: " + queryGroupName);
+        return metrics;
       }
 
-      for (size_t j = 0; j < results.size(); ++j) {
-        const auto& tensor = results[j];
+      int64_t len = t.size(0);
+      for (size_t j = 0; j < t.size(0); ++j) {
+        const auto& tensor = t[j];
         float* data = tensor.data_ptr<float>();
+        if (!data) {
+          std::cerr << "Invalid tensor data for " << queryGroupName << "/tensor_" << j << std::endl;
+          continue;
+        }
         hsize_t dims[1] = {static_cast<hsize_t>(tensor.numel())};
         std::string datasetName = "tensor_" + std::to_string(j);
+        // std::cout << "Creating dataset: " << batchGroupName << "/" << queryGroupName << "/" << datasetName << std::endl;
         dataspaceId = H5Screate_simple(1, dims, nullptr);
         datasetId = H5Dcreate2(queryGroupId, datasetName.c_str(), H5T_NATIVE_FLOAT, dataspaceId, 
                                 H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+        if (datasetId < 0) {
+          std::cerr << "Failed to create dataset: " << datasetName << std::endl;
+          H5Sclose(dataspaceId);
+          continue;
+        }
         status = H5Dwrite(datasetId, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
-        if (status < 0) throw std::runtime_error("Failed to write dataset " + datasetName);
-
+        if (status < 0) {
+          std::cerr << "Failed to write dataset: " << datasetName << std::endl;
+        }
         H5Dclose(datasetId);
         H5Sclose(dataspaceId);
       }
+      H5Gclose(queryGroupId);
     }
     H5Gclose(batchGroupId);
   }

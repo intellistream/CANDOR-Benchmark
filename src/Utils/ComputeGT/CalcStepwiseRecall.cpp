@@ -26,19 +26,45 @@ std::map<uint64_t, std::vector<std::pair<size_t, std::vector<std::vector<float>>
     return result;
   }
 
+  size_t k;
+  hid_t attrId = H5Aopen(groupId, "k", H5P_DEFAULT);
+  if (attrId < 0) {
+    std::cerr << "Error opening attribute 'k' in group: " << groupName << std::endl;
+    H5Gclose(groupId);
+    H5Fclose(fileId);
+    return result;
+  }
+  herr_t status = H5Aread(attrId, H5T_NATIVE_HSIZE, &k);
+  if (status < 0) {
+    std::cerr << "Error reading attribute 'k' in group: " << groupName << std::endl;
+    H5Aclose(attrId);
+    H5Gclose(groupId);
+    H5Fclose(fileId);
+    return result;
+  }
+  H5Aclose(attrId);
+
   hsize_t numObjects;
   H5Gget_num_objs(groupId, &numObjects);
   for (hsize_t i = 0; i < numObjects; i++) {
     char batchName[32];
     H5Gget_objname_by_idx(groupId, i, batchName, sizeof(batchName));
     std::string batchGroupName = std::string(batchName);
+
+  if (batchGroupName.substr(0, 6) != "batch_" || 
+      !std::all_of(batchGroupName.begin() + 6, batchGroupName.end(), ::isdigit)) {
+    std::cerr << "Invalid batch group name: " << batchGroupName << std::endl;
+    continue;
+  }
+  uint64_t batchNum = std::stoul(batchGroupName.substr(6));
+
     hid_t batchGroupId = H5Gopen2(groupId, batchGroupName.c_str(), H5P_DEFAULT);
     if (batchGroupId < 0) {
       std::cerr << "Error opening batch group: " << batchGroupName << std::endl;
       continue;
     }
 
-    uint64_t step = std::stoul(batchGroupName.substr(6)); 
+    uint64_t step = batchNum; 
 
     hsize_t numQueries;
     H5Gget_num_objs(batchGroupId, &numQueries);
@@ -52,20 +78,58 @@ std::map<uint64_t, std::vector<std::pair<size_t, std::vector<std::vector<float>>
         continue;
       }
 
-      std::cout << "queryGroupName " << queryGroupName << std::endl;
-      size_t queryIdx = std::stoul(queryGroupName.substr(6)); 
+      if (queryGroupName.substr(0, 6) != "query_" || 
+          !std::all_of(queryGroupName.begin() + 6, queryGroupName.end(), ::isdigit)) {
+        std::cerr << "Invalid query group name: " << queryGroupName << std::endl;
+        H5Gclose(queryGroupId);
+        continue;
+      }
+      size_t queryIdx = std::stoul(queryGroupName.substr(6));
+
+      hsize_t numTensors;
+      H5Gget_num_objs(queryGroupId, &numTensors);
+      if (numTensors != k) {
+        std::string fullPath = "/" + groupName + "/" + batchGroupName + "/" + queryGroupName;
+        H5Gclose(queryGroupId);
+        H5Gclose(batchGroupId);
+        H5Gclose(groupId);
+        H5Fclose(fileId);
+        throw std::runtime_error("Error: query " + fullPath + " included " + std::to_string(numTensors) + 
+                                " tensor, expected " + std::to_string(k));
+      }
 
       std::vector<std::vector<float>> tensors;
-      for (size_t j = 0; ; j++) {
-        std::string dsName = "tensor_" + std::to_string(j);
+      for (hsize_t t = 0; t < numTensors; t++) {
+        char tensorName[32];
+        H5Gget_objname_by_idx(queryGroupId, t, tensorName, sizeof(tensorName));
+        std::string dsName = std::string(tensorName);
         hid_t datasetId = H5Dopen2(queryGroupId, dsName.c_str(), H5P_DEFAULT);
-        if (datasetId < 0) break;
+        if (datasetId < 0) {
+          std::cerr << "Error opening dataset: " << dsName << std::endl;
+          continue;
+        }
         hid_t dataspaceId = H5Dget_space(datasetId);
         hsize_t dims[1];
         H5Sget_simple_extent_dims(dataspaceId, dims, NULL);
+
+        if (dims[0] == 0) {
+          std::string fullPath = "/" + groupName + "/" + batchGroupName + "/" + queryGroupName + "/" + dsName;
+          H5Sclose(dataspaceId);
+          H5Dclose(datasetId);
+          H5Gclose(queryGroupId);
+          H5Gclose(batchGroupId);
+          H5Gclose(groupId);
+          H5Fclose(fileId);
+          throw std::runtime_error("Error: Empty dataset found at: " + fullPath);
+        }
+        
         std::vector<float> vec(dims[0]);
-        H5Dread(datasetId, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, vec.data());
-        tensors.push_back(std::move(vec));
+        herr_t status = H5Dread(datasetId, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, vec.data());
+        if (status < 0) {
+          std::cerr << "Error reading dataset: " << dsName << std::endl;
+        } else {
+          tensors.push_back(std::move(vec));
+        }
         H5Sclose(dataspaceId);
         H5Dclose(datasetId);
       }
@@ -91,41 +155,24 @@ float COMPUTE_GT::computeL2Distance(const std::vector<float> &v1,
   return std::sqrt(sum);
 }
 
-double
-COMPUTE_GT::calcRecallWithQueryVec(const std::vector<std::vector<float>> &queryVectors,
-                                    const std::vector<std::vector<float>> &annsResult,
-                                    const std::vector<std::vector<float>> &gtVectors,
-                                    float threshold) {
-  if (queryVectors.empty() || annsResult.empty() || gtVectors.empty()) {
+double COMPUTE_GT::calcRecall(const std::vector<std::vector<float>>& annVectors,
+                              const std::vector<std::vector<float>>& gtVectors,
+                              float threshold) {
+  if (annVectors.empty() || gtVectors.empty()) {
     std::cerr << "Error: Input vectors cannot be empty." << std::endl;
     return 0.0;
   }
 
-  size_t correct_count = 0;
-  size_t total_count = annsResult.size();
-
-  for (size_t i = 0; i < queryVectors.size(); i++) {
-    bool queryFound = false;
-    size_t gtIndex = 0;
-    for (size_t j = 0; j < gtVectors.size(); j++) {
-      if (computeL2Distance(queryVectors[i], gtVectors[j]) < threshold) {
-        queryFound = true;
-        gtIndex = j;
-        break;
-      }
-    }
-    if (!queryFound) {
-      std::cerr << "Warning: Query vector not found in GT." << std::endl;
-      continue;
-    }
-
-    for (const auto &annVec : annsResult) {
-      if (computeL2Distance(annVec, gtVectors[gtIndex]) < threshold) {
-        correct_count++;
+  size_t correctCount = 0;
+  for (const auto& annVec : annVectors) {
+    for (const auto& gtVec : gtVectors) {
+      if (computeL2Distance(annVec, gtVec) < threshold) {
+        correctCount++;
+        break;  
       }
     }
   }
-  return static_cast<double>(correct_count) / total_count;
+  return static_cast<double>(correctCount) / gtVectors.size();
 }
 
 std::vector<std::pair<size_t, double>>
@@ -144,7 +191,7 @@ COMPUTE_GT::calcStepwiseRecall(const std::string &annsFile, const std::string &g
       if (gtIt != gtData.end()) {
         for (const auto &[gtQueryIdx, gtVectors] : gtIt->second) {
           if (annQueryIdx == gtQueryIdx) {
-            double recall = calcRecallWithQueryVec(gtVectors, annVectors, gtVectors);
+            double recall = calcRecall(annVectors, gtVectors, 1e-6);
             totalRecall += recall;
             queryCount++;
             break;
@@ -158,5 +205,7 @@ COMPUTE_GT::calcStepwiseRecall(const std::string &annsFile, const std::string &g
       stepwiseRecall.emplace_back(static_cast<size_t>(step), avgRecall);
     }
   }
+
+  std::cout << "RECALL SIZE " << stepwiseRecall.size() << std::endl;
   return stepwiseRecall;
 }

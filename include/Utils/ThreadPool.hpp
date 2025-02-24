@@ -29,6 +29,8 @@ class ThreadPool {
 
   void waitForTasks();
 
+  std::thread::id getCurrentThreadId() const;
+
  private:
   std::vector<std::thread> workers;
   std::queue<std::function<void()>> tasks;

@@ -18,10 +18,9 @@ namespace COMPUTE_GT {
 std::map<uint64_t, std::vector<std::pair<size_t, std::vector<std::vector<float>>>>> 
   readStepwiseHDF5(const std::string& filename, const std::string& groupName);
 
-double calcRecallWithQueryVec(const std::vector<std::vector<float>>& queryVectors,
-                                const std::vector<std::vector<float>>& annsResult,
-                                const std::vector<std::vector<float>>& gtVectors,
-                                float threshold = 1e-6);
+double calcRecall(const std::vector<std::vector<float>>& annVectors,
+                  const std::vector<std::vector<float>>& gtVectors,
+                  float threshold);
 
 std::vector<std::pair<size_t, double>> calcStepwiseRecall(const std::string& annsFile, 
                                                             const std::string& gtFile);

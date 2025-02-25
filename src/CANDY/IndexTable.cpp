@@ -75,7 +75,6 @@ CANDY::IndexTable::IndexTable() {
 #ifdef ENABLE_CUDA
   indexMap["SONG"] = newSONG();
   indexMap["GANNSHNSW"] = newGANNSIndex("hnsw");
-  indexMap["GANNSNSW"] = newGANNSIndex("nsw");
 #endif
 }
 }  // namespace CANDY

@@ -8,6 +8,7 @@
 #include <CANDY/GANNSIndex/kernel_global_edge_sort.h>
 #include <CANDY/GANNSIndex/kernel_aggregate_forward_edges.h>
 #include <CANDY/GANNSIndex/kernel_search_hnsw.h>
+#include <CANDY/GANNSIndex/graph_index/nsw_graph_operations.h>
 
 class HNSWGraphOperations {
 
@@ -164,7 +165,7 @@ public:
 		cudaMalloc(&d_graph, sizeof(int) * (prefix_sum_of_num_array_of_each_layer[0] + num_of_points_on_each_layer[0]) * num_of_final_neighbors);
 		cudaMemcpy(d_graph, h_graph, sizeof(int) * (prefix_sum_of_num_array_of_each_layer[0] + num_of_points_on_each_layer[0]) * num_of_final_neighbors, cudaMemcpyHostToDevice);
 
-		SearchDevice<<<num_of_query_points, 32, (num_of_final_neighbors + num_of_candidates) * (sizeof(KernelPair<float, int>) + sizeof(int))>>>(d_data, d_query, d_result, d_graph, total_num_of_points, 
+		SearchHNSWDevice<<<num_of_query_points, 32, (num_of_final_neighbors + num_of_candidates) * (sizeof(KernelPair<float, int>) + sizeof(int))>>>(d_data, d_query, d_result, d_graph, total_num_of_points,
 																															num_of_query_points, num_of_final_neighbors, num_of_candidates, 
 																															num_of_topk, num_of_explored_points, num_of_layers, d_prefix_sum_of_num_array_of_each_layer);
 

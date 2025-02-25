@@ -34,11 +34,7 @@ bool GANNSIndex::setConfig(INTELLI::ConfigMapPtr cfg) {
 }
 bool GANNSIndex::loadInitialTensorWithIds(std::vector<faiss::idx_t> ids, torch::Tensor &t) {
   points = new gData(t);
-  if(graph_type == "hnsw") {
-    graph = new HierarchicalNavigableSmallWorld(points);
-  } else if(graph_type == "nsw") {
-    graph = new NavigableSmallWorldGraphWithFixedDegree(points);
-  }
+  graph = new HierarchicalNavigableSmallWorld(points);
   graph->USE_L2_DIST_= USE_L2_DIST_;
   graph->USE_IP_DIST_ = USE_IP_DIST_;
   graph->USE_COS_DIST_ = USE_COS_DIST_;

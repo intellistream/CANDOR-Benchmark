@@ -10,7 +10,7 @@
 #include <CANDY/GANNSIndex/structure_on_device.cuh>
 
 __global__
-void SearchDevice(float* d_data, float* d_query, int* d_result, int* d_graph, int total_num_of_points, int num_of_query_points, int num_of_final_neighbors, 
+void SearchHNSWDevice(float* d_data, float* d_query, int* d_result, int* d_graph, int total_num_of_points, int num_of_query_points, int num_of_final_neighbors,
                     int num_of_candidates, int num_of_results, int num_of_explored_points, int num_of_layers, int* prefix_sum_of_num_array_of_each_layer) {
 	int t_id = threadIdx.x;
     int b_id = blockIdx.x;

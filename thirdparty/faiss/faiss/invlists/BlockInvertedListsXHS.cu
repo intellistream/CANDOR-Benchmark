@@ -22,7 +22,7 @@ BlockInvertedListsXHS::BlockInvertedListsXHS(
         : InvertedLists(nlist, InvertedLists::INVALID_CODE_SIZE),
           n_per_block(vec_per_block),
           block_size(block_size),
-          rearrange_threshold(10000) { // 设置碎片整理的阈值
+          rearrange_threshold(512) { // 设置碎片整理的阈值
     memory_pool.resize(1UL << 30); // 预分配1GB GPU内存
     cur_pool_ptr.store(0);
     heads.resize(nlist, nullptr);
@@ -36,7 +36,7 @@ BlockInvertedListsXHS::BlockInvertedListsXHS(
           n_per_block(packer->nvec),
           block_size(packer->block_size),
           packer(packer),
-          rearrange_threshold(10000) { // 设置碎片整理的阈值
+          rearrange_threshold(512) { // 设置碎片整理的阈值
     memory_pool.resize(1UL << 30); // 预分配1GB GPU内存
     cur_pool_ptr.store(0);
     heads.resize(nlist, nullptr);
@@ -57,6 +57,10 @@ MemoryBlock* BlockInvertedListsXHS::allocate_block() {
     block->is_merged = false;
     block->ids = reinterpret_cast<idx_t*>(block + 1);
     block->codes = reinterpret_cast<uint8_t*>(block->ids + n_per_block);
+
+    // printf("Allocated new block: %p, capacity: %zu, size: %zu, cur_pool_ptr: %zu\n",
+           // block, block->capacity, block->size, ptr);
+
     return block;
 }
 
@@ -67,6 +71,8 @@ void BlockInvertedListsXHS::insert_entries(
         const idx_t* ids_in,
         const uint8_t* codes) {
     FAISS_ASSERT(list_no < nlist);
+
+    // printf("Inserting %zu entries into list %zu\n", n_entry, list_no);
 
     // 获取当前尾部块
     MemoryBlock* current = tails[list_no];
@@ -92,18 +98,27 @@ void BlockInvertedListsXHS::insert_entries(
             }
             tails[list_no] = new_block;
             current = new_block;
+
+            // printf("Allocated new block for list %zu. Block address: %p\n", list_no, current);
+
         }
 
         // 计算可以存入当前块的向量数量
         size_t space_left = current->capacity - current->size;
         size_t to_insert = std::min(space_left, remaining);
 
+        // printf("Before inserting: current->size = %d, target GPU memory %p\n", current->size, current->ids);
+
         // 逐个复制 ID 到 GPU
         cudaMemcpy(current->ids + current->size, cur_ids, to_insert * sizeof(idx_t), cudaMemcpyHostToDevice);
+
+        // printf("After inserting: current->size = %d, target GPU memory %p\n", current->size + to_insert, current->ids + to_insert);
 
         // 逐个复制 Codes 到 GPU
         for (size_t i = 0; i < to_insert; ++i) {
             // 每次插入一个向量，调用 pack_1 来压缩代码
+            // printf("Before copying: source memory %p, target memory %p, size = %zu\n", cur_ids, current->ids + current->size, to_insert * sizeof(idx_t));
+
             if (packer) {
                 FAISS_ASSERT(packer->code_size > 0);
                 FAISS_ASSERT(current->codes != nullptr);
@@ -124,6 +139,9 @@ void BlockInvertedListsXHS::insert_entries(
         remaining -= to_insert;
         cur_ids += to_insert;
         cur_codes += to_insert * single_code_size;
+
+        // printf("Remaining entries to insert: %zu\n", remaining);
+
     }
 
     // 检查是否触发碎片整理
@@ -131,6 +149,9 @@ void BlockInvertedListsXHS::insert_entries(
     total_size = list_size(list_no);
     if (total_size >= rearrange_threshold) {
         rearrange_if_needed(list_no);
+
+        // printf("List %zu size: %zu. Fragmentation check triggered.\n", list_no, total_size);
+
     }
 }
 
@@ -138,6 +159,8 @@ void BlockInvertedListsXHS::insert_entries(
 void BlockInvertedListsXHS::rearrange_if_needed(size_t list_no) {
     MemoryBlock* current = heads[list_no];
     // printf("rearrange_if_needed\n");
+    printf("Starting fragmentation rearrangement for list %zu\n", list_no);
+
     while (current) {
         if (current->is_merged) {
             current = current->next;
@@ -153,9 +176,15 @@ void BlockInvertedListsXHS::rearrange_if_needed(size_t list_no) {
             current->size += next_block->size;
             current->next = next_block->next;
             next_block->is_merged = true;  // 确保标记更新
+
+            printf("Merged block %p into current block %p. New size: %zu\n", next_block, current, current->size);
+
         }
         current = current->next;
     }
+
+    printf("Fragmentation rearrangement completed for list %zu\n", list_no);
+
 }
 
 size_t BlockInvertedListsXHS::list_size(size_t list_no) const {
@@ -173,6 +202,20 @@ const uint8_t* BlockInvertedListsXHS::get_codes(size_t list_no) const {
     FAISS_ASSERT(list_no < nlist);
     // tips:返回首个内存块的codes地址（需外部处理链表访问）
     return heads[list_no] ? heads[list_no]->codes : nullptr;
+}
+
+const uint8_t* BlockInvertedListsXHS::get_single_code(size_t list_no, size_t offset) const {
+    FAISS_ASSERT(list_no < nlist);
+    MemoryBlock* block = heads[list_no];
+
+    while (block && offset >= block->size) {
+        offset -= block->size;
+        block = block->next;
+    }
+
+    FAISS_ASSERT(block != nullptr);
+
+    return block->codes + offset * code_size;
 }
 
 const idx_t* BlockInvertedListsXHS::get_ids(size_t list_no) const {

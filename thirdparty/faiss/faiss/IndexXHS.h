@@ -104,7 +104,7 @@ struct IndexXHS : IndexIVF {
      *                duplicates (max size ntotal)
      * @return n      number of groups found
      */
-    size_t find_duplicates(idx_t* ids, size_t* lims) const;
+    // size_t find_duplicates(idx_t* ids, size_t* lims) const;
 
     // map a vector to a binary code knowning the index
     void encode(idx_t key, const float* x, uint8_t* code) const;

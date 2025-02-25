@@ -15,6 +15,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include <faiss/invlists/BlockInvertedListsXHS.h>
 #include <faiss/Clustering.h>
 #include <faiss/Index.h>
 #include <faiss/impl/IDSelector.h>
@@ -486,6 +487,17 @@ struct InvertedListScanner {
             float* distances,
             idx_t* labels,
             size_t k) const;
+
+    virtual size_t scan_codes_XHS(
+            size_t n,
+            const uint8_t* codes,
+            const idx_t* ids,
+            float* distances,
+            idx_t* labels,
+            size_t k,
+            MemoryBlock* head) {
+        return 0;
+    };
 
     // same as scan_codes, using an iterator
     virtual size_t iterate_codes(

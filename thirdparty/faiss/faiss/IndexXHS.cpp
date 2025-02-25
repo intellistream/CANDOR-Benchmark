@@ -8,7 +8,6 @@
 // -*- c++ -*-
 
 #include <faiss/IndexXHS.h>
-
 #include <cassert>
 #include <cinttypes>
 #include <cmath>
@@ -872,7 +871,6 @@ struct IVFPQScannerT : QueryTables {
     // It was observed that doing manual unrolling of the loop that
     //    utilizes distance_single_code() speeds up the computations.
 
-    /// version of the scan where we use precomputed tables.
     template <class SearchResultType>
     void scan_list_with_table(
             size_t ncode,
@@ -945,6 +943,102 @@ struct IVFPQScannerT : QueryTables {
                                 codes + saved_j[2] * pq.code_size);
             res.add(saved_j[2], dis);
         }
+    }
+
+    /// version of the scan where we use precomputed tables.
+    template <class SearchResultType>
+    void scan_list_with_table(
+            const MemoryBlock* head,
+            SearchResultType& res) const {
+        int counter = 0;
+
+        size_t saved_j[4] = {0, 0, 0, 0};
+        size_t global_j = 0;
+        const MemoryBlock* current_block = head;
+        const MemoryBlock* record_block[4] = {nullptr, nullptr, nullptr, nullptr};
+        size_t global_record[4] = {0, 0, 0, 0};
+
+        while (current_block != nullptr) {
+            const size_t block_size = current_block->size;
+
+            // 处理当前块内的所有codes
+            for (size_t local_j = 0; local_j < block_size; local_j++) {
+                const size_t j = global_j + local_j; // 全局索引
+
+                if (res.skip_entry(j)) {
+                    continue;
+                }
+
+                // 保存当前j到saved_j
+                saved_j[counter] = j;
+                record_block[counter] = current_block;
+                global_record[counter] = global_j;
+                counter++;
+
+                // 每满4个，批量计算距离
+                if (counter == 4) {
+                    float distances[4] = {0, 0, 0, 0};
+                    distance_four_codes<PQDecoder>(
+                        pq.M,
+                        pq.nbits,
+                        sim_table,
+                        record_block[0]->codes + (saved_j[0] - global_record[0]) * pq.code_size, // 块内偏移
+                        record_block[1]->codes + (saved_j[1] - global_record[1]) * pq.code_size,
+                        record_block[2]->codes + (saved_j[2] - global_record[2]) * pq.code_size,
+                        record_block[3]->codes + (saved_j[3] - global_record[3]) * pq.code_size,
+                        distances[0],
+                        distances[1],
+                        distances[2],
+                        distances[3]
+                    );
+
+                    for (int k = 0; k < 4; k++) {
+                        res.add(saved_j[k], dis0 + distances[k]);
+                    }
+                    counter = 0;
+                }
+            }
+
+            // 移动到下一个块
+            global_j += block_size;
+            current_block = current_block->next;
+        }
+
+        // 处理剩余不足4个的codes
+        if (counter >= 1) {
+            const MemoryBlock* target_block = record_block[0];
+            float dis = dis0 + distance_single_code<PQDecoder>(
+                pq.M,
+                pq.nbits,
+                sim_table,
+                target_block->codes + (saved_j[0] - global_record[0]) * pq.code_size
+            );
+            res.add(saved_j[0], dis);
+        }
+
+        if (counter >= 2) {
+            const MemoryBlock* target_block = record_block[1];
+            float dis = dis0 + distance_single_code<PQDecoder>(
+                pq.M,
+                pq.nbits,
+                sim_table,
+                target_block->codes + (saved_j[1] - global_record[1]) * pq.code_size
+            );
+            res.add(saved_j[1], dis);
+        }
+
+        if (counter >= 3) {
+            const MemoryBlock* target_block = record_block[2];
+            float dis = dis0 + distance_single_code<PQDecoder>(
+                pq.M,
+                pq.nbits,
+                sim_table,
+                target_block->codes + (saved_j[2] - global_record[2]) * pq.code_size
+            );
+            res.add(saved_j[2], dis);
+        }
+
+        printf("end\n");
     }
 
     /// tables are not precomputed, but pointers are provided to the
@@ -1242,6 +1336,7 @@ struct IVFPQScanner : IVFPQScannerT<idx_t, METRIC_TYPE, PQDecoder>,
             float* heap_sim,
             idx_t* heap_ids,
             size_t k) const override {
+        printf("test2\n");
         KnnSearchResults<C, use_sel> res = {
                 /* key */ this->key,
                 /* ids */ this->store_pairs ? nullptr : ids,
@@ -1256,6 +1351,39 @@ struct IVFPQScanner : IVFPQScannerT<idx_t, METRIC_TYPE, PQDecoder>,
             this->scan_list_polysemous(ncode, codes, res);
         } else if (precompute_mode == 2) {
             this->scan_list_with_table(ncode, codes, res);
+        } else if (precompute_mode == 1) {
+            this->scan_list_with_pointer(ncode, codes, res);
+        } else if (precompute_mode == 0) {
+            this->scan_on_the_fly_dist(ncode, codes, res);
+        } else {
+            FAISS_THROW_MSG("bad precomp mode");
+        }
+        return res.nup;
+    }
+
+    size_t scan_codes_XHS(
+            size_t ncode,
+            const uint8_t* codes,
+            const idx_t* ids,
+            float* heap_sim,
+            idx_t* heap_ids,
+            size_t k,
+            MemoryBlock* head){
+        printf("test2\n");
+        KnnSearchResults<C, use_sel> res = {
+            /* key */ this->key,
+            /* ids */ this->store_pairs ? nullptr : ids,
+            /* sel */ this->sel,
+            /* k */ k,
+            /* heap_sim */ heap_sim,
+            /* heap_ids */ heap_ids,
+            /* nup */ 0};
+
+        if (this->polysemous_ht > 0) {
+            assert(precompute_mode == 2);
+            this->scan_list_polysemous(ncode, codes, res);
+        } else if (precompute_mode == 2) {
+            this->scan_list_with_table(head, res);
         } else if (precompute_mode == 1) {
             this->scan_list_with_pointer(ncode, codes, res);
         } else if (precompute_mode == 0) {
@@ -1359,7 +1487,7 @@ IndexXHS::IndexXHS() {
     polysemous_ht = 0;
     polysemous_training = nullptr;
 }
-
+/*
 struct CodeCmp {
     const uint8_t* tab;
     size_t code_size;
@@ -1401,5 +1529,5 @@ size_t IndexXHS::find_duplicates(idx_t* dup_ids, size_t* lims) const {
     }
     return ngroup;
 }
-
+*/
 } // namespace faiss

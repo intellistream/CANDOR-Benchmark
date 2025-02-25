@@ -8,6 +8,8 @@
 // -*- c++ -*-
 
 #include <faiss/IndexIVF.h>
+#include <faiss/IndexXHS.h>
+#include <faiss/invlists/BlockInvertedListsXHS.h>
 
 #include <omp.h>
 #include <cstdint>
@@ -533,34 +535,52 @@ void IndexIVF::search_preassigned(
                         list_size = list_size_max;
                     }
 
-                    InvertedLists::ScopedCodes scodes(invlists, key);
-                    const uint8_t* codes = scodes.get();
+                    BlockInvertedListsXHS* block_invlists = dynamic_cast<BlockInvertedListsXHS*>(invlists);
+                    if (block_invlists) {
+                        BlockInvertedListsXHS::ScopedCodes scodes(block_invlists, key);
+                        const uint8_t* codes = scodes.get();
 
-                    std::unique_ptr<InvertedLists::ScopedIds> sids;
-                    const idx_t* ids = nullptr;
+                        std::unique_ptr<BlockInvertedListsXHS::ScopedIds> sids;
+                        const idx_t* ids = nullptr;
 
-                    if (!store_pairs) {
-                        sids = std::make_unique<InvertedLists::ScopedIds>(
-                                invlists, key);
-                        ids = sids->get();
-                    }
-
-                    if (selr) { // IDSelectorRange
-                        // restrict search to a section of the inverted list
-                        size_t jmin, jmax;
-                        selr->find_sorted_ids_bounds(
-                                list_size, ids, &jmin, &jmax);
-                        list_size = jmax - jmin;
-                        if (list_size == 0) {
-                            return (size_t)0;
+                        if (!store_pairs) {
+                            sids = std::make_unique<BlockInvertedListsXHS::ScopedIds>(block_invlists, key);
+                            ids = sids->get();
                         }
-                        codes += jmin * code_size;
-                        ids += jmin;
+                        printf("test1\n");
+
+                        nheap += scanner->scan_codes_XHS(list_size, codes, ids, simi, idxi, k, block_invlists->heads[key]);
+
+                    }else {
+
+                        InvertedLists::ScopedCodes scodes(invlists, key);
+                        const uint8_t* codes = scodes.get();
+
+                        std::unique_ptr<InvertedLists::ScopedIds> sids;
+                        const idx_t* ids = nullptr;
+
+                        if (!store_pairs) {
+                            sids = std::make_unique<InvertedLists::ScopedIds>(
+                                    invlists, key);
+                            ids = sids->get();
+                        }
+
+                        if (selr) { // IDSelectorRange
+                            // restrict search to a section of the inverted list
+                            size_t jmin, jmax;
+                            selr->find_sorted_ids_bounds(
+                                    list_size, ids, &jmin, &jmax);
+                            list_size = jmax - jmin;
+                            if (list_size == 0) {
+                                return (size_t)0;
+                            }
+                            codes += jmin * code_size;
+                            ids += jmin;
+                        }
+
+                        nheap += scanner->scan_codes(
+                                list_size, codes, ids, simi, idxi, k);
                     }
-
-                    nheap += scanner->scan_codes(
-                            list_size, codes, ids, simi, idxi, k);
-
                     return list_size;
                 }
             } catch (const std::exception& e) {
@@ -1276,7 +1296,6 @@ size_t InvertedListScanner::scan_codes(
         idx_t* idxi,
         size_t k) const {
     size_t nup = 0;
-
     if (!keep_max) {
         for (size_t j = 0; j < list_size; j++) {
             float dis = distance_to_code(codes);

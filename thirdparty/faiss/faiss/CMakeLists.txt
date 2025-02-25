@@ -139,7 +139,6 @@ set(FAISS_HEADERS
   IndexNSG.h
   IndexPQ.h
   IndexXHS.h
-  IndexFastScan.h
   IndexAdditiveQuantizerFastScan.h
   IndexPQFastScan.h
   IndexPreTransform.h

@@ -99,10 +99,65 @@ struct BlockInvertedListsXHS : InvertedLists {
     void resize(size_t list_no, size_t new_size) override;
 
     MemoryBlock* allocate_block(); // 分配新的 GPU 内存块
+    const uint8_t* get_single_code(size_t list_no, size_t offset) const override;
     void insert_entries(size_t list_no, size_t n_entry, const idx_t* ids_in, const uint8_t* codes);
     void rearrange_if_needed(size_t list_no); // 碎片整理
 
     ~BlockInvertedListsXHS();
+
+    struct ScopedCodes {
+        const BlockInvertedListsXHS* il;  // 指向 BlockInvertedLists
+        const uint8_t* codes;          // 指向 codes 数据
+        size_t list_no;                // 倒排列表编号
+
+        // 构造函数：获取整个 list_no 的 codes
+        ScopedCodes(const BlockInvertedListsXHS* il, size_t list_no)
+            : il(il), codes(il->get_codes(list_no)), list_no(list_no) {}
+
+        // 构造函数：获取 list_no 的某个 offset 的 code
+        ScopedCodes(const BlockInvertedListsXHS* il, size_t list_no, size_t offset)
+            : il(il), codes(il->get_single_code(list_no, offset)), list_no(list_no) {}
+
+        // 获取 codes 指针
+        const uint8_t* get() {
+            return codes;
+        }
+
+        ~ScopedCodes() {
+            il->release_codes(list_no, codes);
+        }
+    };
+
+    struct ScopedIds {
+        const BlockInvertedListsXHS* il;  // 指向 BlockInvertedLists
+        const idx_t* ids;              // 指向 ID 数据
+        size_t list_no;                // 倒排列表编号
+
+        // 构造函数：获取 list_no 的 ID 列表
+        ScopedIds(const BlockInvertedListsXHS* il, size_t list_no)
+            : il(il), ids(il->get_ids(list_no)), list_no(list_no) {}
+
+        // 获取 ID 指针
+        const idx_t* get() {
+            return ids;
+        }
+
+        // 重载 `operator[]`，支持按索引访问 ID
+        idx_t operator[](size_t i) const {
+            MemoryBlock* block = il->heads[list_no];
+            size_t offset = i;
+            while (block && offset >= block->size) {
+                offset -= block->size;
+                block = block->next;
+            }
+            return block->ids[offset];
+        }
+
+        ~ScopedIds() {
+            il->release_ids(list_no, ids);
+        }
+    };
+
 };
 
 struct BlockInvertedListsXHSIOHook : InvertedListsIOHook {

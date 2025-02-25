@@ -18,13 +18,14 @@ namespace CANDY {
 class NSWlibIndex : public AbstractIndex {
  protected:
   int64_t vecDim;
-  int64_t M;
-  int64_t ef;
   int64_t maxElements;
   std::string metricType;
   std::atomic<int64_t> count{0};
 
+  int64_t M;
+  int64_t ef;
   std::unique_ptr<hnswlib::SpaceInterface<float>> space;
+  
   std::unique_ptr<hnswlib::HierarchicalNSW<float>> index;
 
  public:

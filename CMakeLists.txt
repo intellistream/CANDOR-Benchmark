@@ -84,7 +84,7 @@ option(ENABLE_PYBIND
 )
 option(ENABLE_DiskANN
         "Enable DiskANN support"
-        OFF
+        ON
 )
 
 if (NOT MSVC)
@@ -276,6 +276,10 @@ configure_file(
 add_subdirectory(thirdparty/hnswlib)
 include_directories(thirdparty/hnswlib/hnswlib)
 set(LIBRARIES ${LIBRARIES} hnswlib)
+
+# add_subdirectory(thirdparty/DiskANN)
+# include_directories(thirdparty/DiskANN/include)
+# set(LIBRARIES ${LIBRARIES} diskann)
 
 # Reset output directories for the rest of your project
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)

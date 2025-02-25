@@ -5,6 +5,7 @@ import sys
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 import glob
+import multiprocessing
 
 class CMakeExtension(Extension):
     def __init__(self, name, sourcedir=""):
@@ -39,7 +40,7 @@ class CMakeBuild(build_ext):
         os.system('nproc >> 1.txt')
         with open('1.txt', 'r') as file:
             threads = file.read().rstrip('\n')
-        threads = str(2)
+        threads = str(multiprocessing.cpu_count())
         os.system('rm 1.txt')
         #os.system('cd thirdparty&&./makeClean.sh&&./installPAPI.sh')
         print(threads)
@@ -64,7 +65,7 @@ class CMakeBuild(build_ext):
         cmake_args += ['-DCMAKE_BUILD_TYPE=' + cfg]
 
         build_args = ['--config', cfg]
-        build_args +=  ['--', '-j'+threads]
+        build_args +=  ['--', '-j'+ threads]
         if not os.path.exists(self.build_temp):
             os.makedirs(self.build_temp)
         subprocess.run(['cmake', ext.sourcedir] + cmake_args, cwd=self.build_temp,check=True)

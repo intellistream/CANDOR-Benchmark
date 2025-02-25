@@ -1,5 +1,5 @@
 #pragma once
-#include "structure_on_device.cuh"
+#include <CANDY/GANNSIndex/structure_on_device.cuh>
 __global__ 
 void SortNeighborsonLocalGraph(KernelPair<float, int>* old_neighbors, int total_num_of_points, float* d_data, int num_of_points_one_batch, 
                                     int num_of_initial_neighbors, int num_of_final_neighbors, KernelPair<float, int>* distance_matrix){
@@ -46,7 +46,7 @@ void SortNeighborsonLocalGraph(KernelPair<float, int>* old_neighbors, int total_
         int num_of_candidates = num_of_initial_neighbors;
 
 // BITONIC_SORT_ON_CRT_BESTS_
-#include "macro/bitonic_sort_on_crt_bests.h"
+#include <CANDY/GANNSIndex/macro/bitonic_sort_on_crt_bests.h>
         for (int j = 1; j < num_of_sequences_with_fixed_size; j++) {
 
             //load other neighbors
@@ -69,9 +69,9 @@ void SortNeighborsonLocalGraph(KernelPair<float, int>* old_neighbors, int total_
             int length_of_compared_list = num_of_initial_neighbors;
 
 // BITONIC_SORT_ON_NEIGHBORS_
-#include "macro/bitonic_sort_on_neighbors.h"
+#include <CANDY/GANNSIndex/macro/bitonic_sort_on_neighbors.h>
 // WITHOUT_FLAG_BITONIC_MERGE_
-#include "macro/without_flag_bitonic_merge.h"
+#include <CANDY/GANNSIndex/macro/without_flag_bitonic_merge.h>
         }
 
         KernelPair<float, int>* crt_old_neighbors = old_neighbors + (crt_point_id * num_of_final_neighbors);

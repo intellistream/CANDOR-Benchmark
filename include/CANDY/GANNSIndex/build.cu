@@ -3,9 +3,9 @@
 #include <iostream>
 #include <fstream>
 #include <algorithm>
-#include "data.h"
-#include "graph_index/navigable_small_world.h"
-#include "graph_index/hierarchical_navigable_small_world.h"
+#include <CANDY/GANNSIndex/data.h>
+#include <CANDY/GANNSIndex/graph_index/navigable_small_world.h>
+#include <CANDY/GANNSIndex/graph_index/hierarchical_navigable_small_world.h>
 
 using namespace std;
 

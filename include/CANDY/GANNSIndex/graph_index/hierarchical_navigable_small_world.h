@@ -2,17 +2,18 @@
 #include <random>
 #include <cmath>
 #include <chrono>
-#include "../data.h"
-#include "../structure_on_device.cuh"
-#include "hnsw_graph_operations.h"
-#include "wrapper.h"
+#include <CANDY/GANNSIndex/data.h>
+#include <CANDY/GANNSIndex/structure_on_device.cuh>
+#include <CANDY/GANNSIndex/graph_index/hnsw_graph_operations.h>
+#include <CANDY/GANNSIndex/graph_index/wrapper.h>
+#include <queue>
+#include <unordered_set>
 
-using namespace std;
 
 class HierarchicalNavigableSmallWorld : public GraphWrapper{
 
 private:
-    Data* points_;
+    gData* points_;
     int num_of_points_one_batch_ = 500;
     int num_of_batches_;
     int num_of_layers_ = 0;
@@ -151,9 +152,9 @@ public:
     }
 
     void SearchTopK(float* query_point, int k, vector<pair<float, int>> &result) {
-        priority_queue<pair<float, int>, vector<pair<float, int>>, std::greater<pair<float, int>>> pq;
+        std::priority_queue<pair<float, int>, vector<pair<float, int>>, std::greater<pair<float, int>>> pq;
 
-        unordered_set<int> visited;
+        std::unordered_set<int> visited;
         int start = 0;
         visited.insert(start);
         pq.push(std::make_pair(distance(points_->GetFirstPositionofPoint(start), query_point), start));
@@ -221,7 +222,7 @@ public:
         std::cout << "Query speed: " << (double)num_of_query_points/((double)std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count()/1000000) << " queries per second" << endl;
     }
 
-	void Establishment(std::vector<faiss::idx_t> ids,int num_of_initial_neighbors, int num_of_candidates){
+	void Establishment(std::vector<int64_t> ids,int num_of_initial_neighbors, int num_of_candidates){
 		num_of_candidates = pow(2.0, ceil(log(num_of_candidates) / log(2)));
         num_of_initial_neighbors_ = pow(2.0, ceil(log(num_of_initial_neighbors) / log(2)));
 		num_of_final_neighbors = num_of_initial_neighbors_ * 2;
@@ -246,7 +247,7 @@ public:
         std::copy(substitute.begin(), substitute.end(), first_subgraph);
 
         for (int i = 1; i < num_of_points_one_batch_; i++) {
-        	faiss :: idx_t point_id = ids[i-1];
+        	int64_t point_id = ids[i-1];
             AddPointinGraph(point_id, points_->GetFirstPositionofPoint(point_id));
         }
 

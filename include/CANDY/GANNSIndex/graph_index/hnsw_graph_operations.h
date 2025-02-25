@@ -2,12 +2,12 @@
 
 #include <cuda_runtime.h>
 #include <cooperative_groups.h>
-#include "../kernel_local_graph_construction.h"
-#include "../kernel_local_neighbors_sort_hnsw.h"
-#include "../kernel_local_graph_mergence_hnsw.h"
-#include "../kernel_global_edge_sort.h"
-#include "../kernel_aggregate_forward_edges.h"
-#include "../kernel_search_hnsw.h"
+#include <CANDY/GANNSIndex/kernel_local_graph_construction.h>
+#include <CANDY/GANNSIndex/kernel_local_neighbors_sort_hnsw.h>
+#include <CANDY/GANNSIndex/kernel_local_graph_mergence_hnsw.h>
+#include <CANDY/GANNSIndex/kernel_global_edge_sort.h>
+#include <CANDY/GANNSIndex/kernel_aggregate_forward_edges.h>
+#include <CANDY/GANNSIndex/kernel_search_hnsw.h>
 
 class HNSWGraphOperations {
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "structure_on_device.cuh"
+#include <CANDY/GANNSIndex/structure_on_device.cuh>
 
 __global__ 
 void AggragateForwardEdges (KernelPair<float, int>* neighbors, Edge* edge_list, int* flags, int total_num_of_points, int num_of_visited_points_one_batch, int offset_shift) {
@@ -49,7 +49,7 @@ void AggragateForwardEdges (KernelPair<float, int>* neighbors, Edge* edge_list, 
         int length_of_compared_list = num_of_visited_points_one_batch;
 
 // WITHOUT_FLAG_BITONIC_MERGE_
-#include "macro/without_flag_bitonic_merge.h"
+#include <CANDY/GANNSIndex/macro/without_flag_bitonic_merge.h>
         for (int i = 0; i < (num_of_candidates + size_of_warp - 1) / size_of_warp; i++) {
             int unrollt_id = t_id + size_of_warp * i;
             

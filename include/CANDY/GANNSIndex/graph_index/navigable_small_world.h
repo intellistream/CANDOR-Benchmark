@@ -8,12 +8,11 @@
 #include <unordered_set>
 #include <fstream>
 #include <chrono>
-#include "../data.h"
-#include "../structure_on_device.cuh"
-#include "nsw_graph_operations.h"
-#include "wrapper.h"
+#include <CANDY/GANNSIndex/data.h>
+#include <CANDY/GANNSIndex/structure_on_device.cuh>
+#include <CANDY/GANNSIndex/graph_index/nsw_graph_operations.h>
+#include <CANDY/GANNSIndex/graph_index/wrapper.h>
 
-using namespace std;
 
 class NavigableSmallWorldGraphWithFixedDegree : public GraphWrapper{
 
@@ -24,7 +23,7 @@ private:
     int num_of_points_one_batch_ = 500;
     int num_of_batches_;
     int* graph_;
-    Data* points_;
+    gData* points_;
     pair<float, int>* first_subgraph;
     std::mt19937_64 rand_gen_ = std::mt19937_64(1234567);
 
@@ -166,7 +165,7 @@ public:
 
     }
 
-    void Establishment(std::vector<faiss::idx_t> ids,int num_of_initial_neighbors, int num_of_candidates){
+    void Establishment(std::vector<int64_t> ids,int num_of_initial_neighbors, int num_of_candidates){
         float* d_points;
         KernelPair<float, int>* d_neighbors;
         KernelPair<float, int>* d_neighbors_backup;
@@ -187,7 +186,7 @@ public:
         std::copy(substitute.begin(), substitute.end(), first_subgraph);
 
         for (int i = 1; i < num_of_points_one_batch_; i++) {
-            faiss::idx_t id = ids[i-1];
+            int64_t id = ids[i-1];
             AddPointinGraph(id, points_->GetFirstPositionofPoint(id));
         }
 

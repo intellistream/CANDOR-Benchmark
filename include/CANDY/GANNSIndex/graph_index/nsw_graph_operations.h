@@ -1,14 +1,15 @@
+
 #pragma once
 
 #include <cuda_runtime.h>
 #include <cooperative_groups.h>
-#include "../structure_on_device.cuh"
-#include "../kernel_local_graph_construction.h"
-#include "../kernel_local_neighbors_sort_nsw.h"
-#include "../kernel_local_graph_mergence_nsw.h"
-#include "../kernel_global_edge_sort.h"
-#include "../kernel_aggregate_forward_edges.h"
-#include "../kernel_search_nsw.h"
+#include <CANDY/GANNSIndex/structure_on_device.cuh>
+#include <CANDY/GANNSIndex/kernel_local_graph_construction.h>
+#include <CANDY/GANNSIndex/kernel_local_neighbors_sort_nsw.h>
+#include <CANDY/GANNSIndex/kernel_local_graph_mergence_nsw.h>
+#include <CANDY/GANNSIndex/kernel_global_edge_sort.h>
+#include <CANDY/GANNSIndex/kernel_aggregate_forward_edges.h>
+#include <CANDY/GANNSIndex/kernel_search_nsw.h>
 
 __global__
 void ConvertNeighborstoGraph(int* d_graph, KernelPair<float, int>* d_neighbors, int total_num_of_points, int offset_shift, int num_of_iterations){
@@ -80,7 +81,7 @@ public:
 	
 	static void LocalGraphMergenceCoorperativeGroup(float* d_data, int* &h_graph, int total_num_of_points, int dim_of_point, int offset_shift, int num_of_initial_neighbors, int num_of_batches, 
 														int num_of_points_one_batch, KernelPair<float, int>* d_neighbors, KernelPair<float, int>* d_neighbors_backup,
-														int num_of_final_neighbors, int num_of_candidates, pair<float, int>* first_subgraph){
+														int num_of_final_neighbors, int num_of_candidates, std::pair<float, int>* first_subgraph){
 
 		int* d_graph;
 
@@ -102,9 +103,9 @@ public:
 		cudaMallocHost(&h_block_recorder, num_of_points_one_batch * sizeof(unsigned long long int));
 		cudaMalloc(&d_block_recorder, num_of_points_one_batch * sizeof(unsigned long long int));
 
-		pair<float, int>* d_first_subgraph;
-		cudaMalloc(&d_first_subgraph, num_of_points_one_batch * num_of_final_neighbors * sizeof(pair<float, int>));
-		cudaMemcpy(d_first_subgraph, first_subgraph, num_of_points_one_batch * num_of_final_neighbors * sizeof(pair<float, int>), cudaMemcpyHostToDevice);
+		std::pair<float, int>* d_first_subgraph;
+		cudaMalloc(&d_first_subgraph, num_of_points_one_batch * num_of_final_neighbors * sizeof(std::pair<float, int>));
+		cudaMemcpy(d_first_subgraph, first_subgraph, num_of_points_one_batch * num_of_final_neighbors * sizeof(std::pair<float, int>), cudaMemcpyHostToDevice);
 		
 		LoadFirstSubgraph<<<num_of_points_one_batch, num_of_final_neighbors>>>(d_first_subgraph, d_neighbors, num_of_points_one_batch * num_of_final_neighbors);
 

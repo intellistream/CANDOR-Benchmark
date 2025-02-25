@@ -1,5 +1,5 @@
 #pragma once
-#include "structure_on_device.cuh"
+#include <CANDY/GANNSIndex/structure_on_device.cuh>
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 __global__ 
@@ -27,7 +27,7 @@ void LocalGraphMergence(KernelPair<float, int>* d_neighbors, KernelPair<float, i
     KernelPair<float, int>* crt_old_neighbors = d_neighbors_backup + (crt_point_id * num_of_final_neighbors);
 
 // DECLARE_FEATURE_
-#include "macro/declare_feature.h"
+#include <CANDY/GANNSIndex/macro/declare_feature.h>
     int step_id;
     int substep_id;
 
@@ -60,11 +60,11 @@ void LocalGraphMergence(KernelPair<float, int>* d_neighbors, KernelPair<float, i
     int target_point_id = 0;
     
 // DECLARE_SECOND_FEATURE_
-#include "macro/declare_second_feature.h"
+#include <CANDY/GANNSIndex/macro/declare_second_feature.h>
 // COMPUTATION_
-#include "macro/computation.h"
+#include <CANDY/GANNSIndex/macro/computation.h>
 // SUM_UP_
-#include "macro/sum_up.h"
+#include <CANDY/GANNSIndex/macro/sum_up.h>
 // WITHIN_WARP_
     dist += __shfl_down_sync(FULL_MASK, dist, 16);
 #include "macro/within_warp.h"

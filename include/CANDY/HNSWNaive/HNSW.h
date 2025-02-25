@@ -313,7 +313,7 @@ public:
                         VertexPtr pt_id, VisitedTable &vt);
 
   void set_mode(opt_mode_t opt_mode, faiss::MetricType metric);
-  string transform_from_tensor(INTELLI::TensorPtr idx);
+  std::string transform_from_tensor(INTELLI::TensorPtr idx);
   HNSW() = default;
 };
 

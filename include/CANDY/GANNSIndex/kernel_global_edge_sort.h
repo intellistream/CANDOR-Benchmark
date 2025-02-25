@@ -1,6 +1,6 @@
 #pragma once
 
-#include "structure_on_device.cuh"
+#include <CANDY/GANNSIndex/structure_on_device.cuh>
 namespace cg = cooperative_groups;
 
 __global__ 

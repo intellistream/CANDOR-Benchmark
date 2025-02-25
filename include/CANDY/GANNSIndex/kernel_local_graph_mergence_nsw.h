@@ -1,5 +1,5 @@
 #pragma once
-#include "structure_on_device.cuh"
+#include <CANDY/GANNSIndex/structure_on_device.cuh>
 #include <cuda_runtime.h>
 
 __global__ 
@@ -24,7 +24,7 @@ void LocalGraphMergence(KernelPair<float, int>* d_neighbors, KernelPair<float, i
     KernelPair<float, int>* crt_old_neighbors = d_neighbors_backup + (crt_point_id << offset_shift);
 
 // DECLARE_FEATURE_
-#include "macro/declare_feature.h"
+#include <CANDY/GANNSIndex/macro/declare_feature.h>
     int step_id;
     int substep_id;
 
@@ -60,13 +60,13 @@ void LocalGraphMergence(KernelPair<float, int>* d_neighbors, KernelPair<float, i
     int target_point_id = 0;
     
 // DECLARE_SECOND_FEATURE_
-#include "macro/declare_second_feature.h"
+#include <CANDY/GANNSIndex/macro/declare_second_feature.h>
 // COMPUTATION_
-#include "macro/computation.h"
+#include <CANDY/GANNSIndex/macro/computation.h>
 // SUM_UP_
-#include "macro/sum_up.h"
+#include <CANDY/GANNSIndex/macro/sum_up.h>
 // WITHIN_WARP_
-#include "macro/within_warp.h"
+#include <CANDY/GANNSIndex/macro/within_warp.h>
     if (t_id == 0) {
         neighbors_array[0].first = dist;
     }
@@ -96,13 +96,13 @@ void LocalGraphMergence(KernelPair<float, int>* d_neighbors, KernelPair<float, i
             }
             
 // DECLARE_SECOND_FEATURE_
-#include "macro/declare_second_feature.h"
+#include <CANDY/GANNSIndex/macro/declare_second_feature.h>
 // COMPUTATION_
-#include "macro/computation.h"
+#include <CANDY/GANNSIndex/macro/computation.h>
 // SUM_UP_
-#include "macro/sum_up.h"
+#include <CANDY/GANNSIndex/macro/sum_up.h>
 // WITHIN_WARP_
-#include "macro/within_warp.h"
+#include <CANDY/GANNSIndex/macro/within_warp.h>
                 if (t_id == 0) {
                     neighbors_array[num_of_candidates+i].first = dist;
                 }
@@ -110,7 +110,7 @@ void LocalGraphMergence(KernelPair<float, int>* d_neighbors, KernelPair<float, i
         }
 
 // BINARY_SEARCH_
-#include "macro/binary_search.h"
+#include <CANDY/GANNSIndex/macro/binary_search.h>
         for(int i = 0; i < (num_of_visited_points_one_batch + size_of_warp - 1) / size_of_warp; i++){
             int unrollt_id = t_id + size_of_warp * i;
 
@@ -120,9 +120,9 @@ void LocalGraphMergence(KernelPair<float, int>* d_neighbors, KernelPair<float, i
         }
 
 // BITONIC_SORT_ON_NEIGHBORS_
-#include "macro/bitonic_sort_on_neighbors.h"
+#include <CANDY/GANNSIndex/macro/bitonic_sort_on_neighbors.h>
 // BITONIC_MERGE_
-#include "macro/bitonic_merge.h"
+#include <CANDY/GANNSIndex/macro/bitonic_merge.h>
         for (int i = 0; i < (num_of_candidates + size_of_warp - 1) / size_of_warp; i++) {
             int unrollt_id = t_id + size_of_warp * i;
             int crt_flag = 0;
@@ -151,7 +151,7 @@ void LocalGraphMergence(KernelPair<float, int>* d_neighbors, KernelPair<float, i
     }
 
 // BITONIC_MERGE_
-#include "macro/bitonic_merge.h"
+#include <CANDY/GANNSIndex/macro/bitonic_merge.h>
     for (int i = 0; i < (num_of_initial_neighbors + size_of_warp - 1) / size_of_warp; i++) {
         int unrollt_id = t_id + size_of_warp * i;
         KernelPair<float, int> temporary_neighbor = neighbors_array[unrollt_id];

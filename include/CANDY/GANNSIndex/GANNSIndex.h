@@ -6,14 +6,14 @@
 #define GANNSINDEX_H
 #include <CANDY/AbstractIndex.h>
 namespace CANDY{
-    extern int64_t DIM;
+    extern int64_t GANNS_DIM;
     extern int USE_L2_DIST_ ;
     extern int  USE_IP_DIST_;
     extern int  USE_COS_DIST_ ;
 }
-#include "../GANNSIndex/graph_index/navigable_small_world.h"
-#include "../GANNSIndex/graph_index/hierarchical_navigable_small_world.h"
-#include "../GANNSIndex/data.h"
+#include <CANDY/GANNSIndex/graph_index/navigable_small_world.h>
+#include <CANDY/GANNSIndex/graph_index/hierarchical_navigable_small_world.h>
+#include <CANDY/GANNSIndex/data.h>
 namespace CANDY{
 
 class GANNSIndex : public AbstractIndex{

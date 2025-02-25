@@ -10,7 +10,7 @@ add_sources(
         OnlinePQIndex.cpp
         #OnlineIVFLSHIndex.cpp
         #OnlineIVFL2HIndex.cpp
-#        IndexTable.cpp
+        IndexTable.cpp
         #PQIndex.cpp
         HNSWNaiveIndex.cpp
         FaissIndex.cpp

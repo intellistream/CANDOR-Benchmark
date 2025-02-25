@@ -614,7 +614,7 @@ int CANDY::HNSW::prepare_level_tab(torch::Tensor &x, bool preset_levels,
   return max_level;
 }
 
-string CANDY::HNSW::transform_from_tensor(INTELLI::TensorPtr idx) {
+std::string CANDY::HNSW::transform_from_tensor(INTELLI::TensorPtr idx) {
   std::stringstream stream;
   torch::save(*idx, stream);
   return stream.str();

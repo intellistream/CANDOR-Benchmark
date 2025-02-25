@@ -29,7 +29,7 @@ bool GANNSIndex::setConfig(INTELLI::ConfigMapPtr cfg) {
   }
 
   vecDim= cfg->tryI64("vecDim", 768, true);
-  DIM = vecDim;
+  GANNS_DIM = vecDim;
   return true;
 }
 bool GANNSIndex::loadInitialTensorWithIds(std::vector<faiss::idx_t> ids, torch::Tensor &t) {

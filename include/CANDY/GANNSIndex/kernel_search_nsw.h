@@ -7,7 +7,7 @@
 #include<cuda_runtime.h>
 #include<chrono>
 #include<iostream>
-#include "structure_on_device.cuh"
+#include <CANDY/GANNSIndex/structure_on_device.cuh>
 
 __global__
 void SearchDevice(float* d_data, float* d_query, int* d_result, int* d_graph, int total_num_of_points, int num_of_query_points, int offset_shift, 
@@ -25,7 +25,7 @@ void SearchDevice(float* d_data, float* d_query, int* d_result, int* d_graph, in
     unsigned long long* crt_time_breakdown = time_breakdown + crt_point_id * 6;
     
 // DECLARE_QUERY_POINT_
-#include "./macro/declare_query_point.h"
+#include <CANDY/GANNSIndex/macro/declare_query_point.h>
 
     int step_id;
     int substep_id;
@@ -63,13 +63,13 @@ void SearchDevice(float* d_data, float* d_query, int* d_result, int* d_graph, in
     int target_point_id = 0;
     
 // DECLARE_SECOND_FEATURE_
-#include "./macro/declare_second_feature.h"
+#include <CANDY/GANNSIndex/macro/declare_second_feature.h>
 // COMPUTATION_
-#include"./macro/computation.h"
+#include<CANDY/GANNSIndex/macro/computation.h>
 // SUM_UP_
-#include "./macro/sum_up.h"
+#include <CANDY/GANNSIndex/macro/sum_up.h>
 // WITHIN_WARP_
-#include "./macro/within_warp.h"
+#include <CANDY/GANNSIndex/macro/within_warp.h>
     if (t_id == 0) {
         neighbors_array[0].first = dist;
     }
@@ -107,13 +107,13 @@ void SearchDevice(float* d_data, float* d_query, int* d_result, int* d_graph, in
             }
             
 // DECLARE_SECOND_FEATURE_
-#include "./macro/declare_second_feature.h"
+#include <CANDY/GANNSIndex/macro/declare_second_feature.h>
 // COMPUTATION_
-#include "./macro/computation.h"
+#include <CANDY/GANNSIndex/macro/computation.h>
 // SUM_UP_
-#include "./macro/sum_up.h"
+#include <CANDY/GANNSIndex/macro/sum_up.h>
 // WITHIN_WARP_
-#include "./macro/within_warp.h"
+#include <CANDY/GANNSIndex/macro/within_warp.h>
                 if (t_id == 0) {
                     neighbors_array[num_of_candidates+i].first = dist;
                 }
@@ -126,7 +126,7 @@ void SearchDevice(float* d_data, float* d_query, int* d_result, int* d_graph, in
 
         auto stage4_start = clock64();
 // BINARY_SEARCH_
-#include "./macro/binary_search.h"
+#include <CANDY/GANNSIndex/macro/binary_search.h>
         auto stage4_end = clock64();
         if(t_id == 0){
             crt_time_breakdown[3] += stage4_end - stage4_start;
@@ -134,7 +134,7 @@ void SearchDevice(float* d_data, float* d_query, int* d_result, int* d_graph, in
 
         auto stage5_start = clock64();
 // BITONIC_SORT_ON_NEIGHBORS_
-#include "./macro/bitonic_sort_on_neighbors.h"
+#include <CANDY/GANNSIndex/macro/bitonic_sort_on_neighbors.h>
         auto stage5_end = clock64();
         if(t_id == 0){
             crt_time_breakdown[4] += stage5_end - stage5_start;
@@ -142,7 +142,7 @@ void SearchDevice(float* d_data, float* d_query, int* d_result, int* d_graph, in
         
         auto stage6_start = clock64();
 // BITONIC_MERGE_
-#include "./macro//bitonic_merge.h"
+#include <CANDY/GANNSIndex/macro//bitonic_merge.h>
         auto stage6_end = clock64();
         if(t_id == 0){
             crt_time_breakdown[5] += stage6_end - stage6_start;

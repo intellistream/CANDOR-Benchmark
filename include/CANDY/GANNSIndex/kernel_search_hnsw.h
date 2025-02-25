@@ -7,7 +7,7 @@
 #include<cuda_runtime.h>
 #include<chrono>
 #include<iostream>
-#include "structure_on_device.cuh"
+#include <CANDY/GANNSIndex/structure_on_device.cuh>
 
 __global__
 void SearchDevice(float* d_data, float* d_query, int* d_result, int* d_graph, int total_num_of_points, int num_of_query_points, int num_of_final_neighbors, 
@@ -24,7 +24,7 @@ void SearchDevice(float* d_data, float* d_query, int* d_result, int* d_graph, in
     int* crt_result = d_result + crt_point_id * num_of_results;
     
 // DECLARE_QUERY_POINT_
-#include "macro/declare_query_point.h"
+#include <CANDY/GANNSIndex/macro/declare_query_point.h>
 
     int step_id;
     int substep_id;
@@ -60,13 +60,13 @@ void SearchDevice(float* d_data, float* d_query, int* d_result, int* d_graph, in
     int target_point_id = 0;
     
 // DECLARE_SECOND_FEATURE_
-#include "macro/declare_second_feature.h"
+#include <CANDY/GANNSIndex/macro/declare_second_feature.h>
 // COMPUTATION_
-#include "macro/computation.h"
+#include <CANDY/GANNSIndex/macro/computation.h>
 // SUM_UP_
-#include "macro/sum_up.h"
+#include <CANDY/GANNSIndex/macro/sum_up.h>
 // WITHIN_WARP_
-#include "macro/within_warp.h"
+#include <CANDY/GANNSIndex/macro/within_warp.h>
     if (t_id == 0) {
         neighbors_array[0].first = dist;
     }
@@ -105,13 +105,13 @@ void SearchDevice(float* d_data, float* d_query, int* d_result, int* d_graph, in
             }
             
 // DECLARE_SECOND_FEATURE_
-#include "macro/declare_second_feature.h"
+#include <CANDY/GANNSIndex/macro/declare_second_feature.h>
 // COMPUTATION_
-#include "macro/computation.h"
+#include <CANDY/GANNSIndex/macro/computation.h>
 // SUM_UP_
-#include "macro/sum_up.h"
+#include <CANDY/GANNSIndex/macro/sum_up.h>
 // WITHIN_WARP_
-#include "macro/within_warp.h"
+#include <CANDY/GANNSIndex/macro/within_warp.h>
                 if (t_id == 0) {
                     neighbors_array[num_of_candidates+i].first = dist;
                 }
@@ -119,11 +119,11 @@ void SearchDevice(float* d_data, float* d_query, int* d_result, int* d_graph, in
         }
 
 // BINARY_SEARCH_
-#include "macro/binary_search.h"
+#include <CANDY/GANNSIndex/macro/binary_search.h>
 // BITONIC_SORT_ON_NEIGHBORS_
-#include "macro/bitonic_sort_on_neighbors.h"
+#include <CANDY/GANNSIndex/macro/bitonic_sort_on_neighbors.h>
 // BITONIC_MERGE_
-#include "macro/bitonic_merge.h"
+#include <CANDY/GANNSIndex/macro/bitonic_merge.h>
 
         for (int i = 0; i < (num_of_explored_points + size_of_warp - 1) / size_of_warp; i++) {
             int unrollt_id = t_id + size_of_warp * i;

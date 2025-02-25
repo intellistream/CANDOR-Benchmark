@@ -17,8 +17,7 @@
 * @{
  * This package is used for some common tensor operations
 */
-using namespace std;
-using namespace torch;
+
 namespace INTELLI {
 
 /**
@@ -32,7 +31,7 @@ typedef std::shared_ptr<torch::Tensor> TensorPtr;
  * @def newTensor
  * @brief (Macro) To creat a new @ref Tensor under shared pointer.
  */
-#define  newTensor make_shared<torch::Tensor>
+#define  newTensor std::make_shared<torch::Tensor>
 
 /**
  * @ingroup INTELLI_UTIL_INTELLItensor

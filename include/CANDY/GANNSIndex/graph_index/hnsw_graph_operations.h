@@ -27,7 +27,7 @@ public:
 		
 		DistanceMatrixComputation<<<num_of_batches, 32>>>(d_data, total_num_of_points, num_of_points_one_batch, d_distance_matrix);
 
-		SortNeighborsonLocalGraph<<<num_of_points_one_batch, 32, 2 * num_of_initial_neighbors * sizeof(KernelPair<float, int>)>>>(d_neighbors_backup, total_num_of_points, 
+		SortNeighborsonLocalGraphHNSW<<<num_of_points_one_batch, 32, 2 * num_of_initial_neighbors * sizeof(KernelPair<float, int>)>>>(d_neighbors_backup, total_num_of_points,
     	                                    																									d_data, 
     	                                    																									num_of_points_one_batch, 
     	                                    																									num_of_initial_neighbors, 
@@ -89,7 +89,7 @@ public:
 									num_of_points_on_each_layer[crt_layer + 1] * num_of_final_neighbors * sizeof(KernelPair<float, int>), cudaMemcpyDeviceToDevice);
 			}
 			
-			LocalGraphMergence<<<num_of_points_one_batch, 32, (num_of_final_neighbors + num_of_candidates) * (sizeof(KernelPair<float, int>) + sizeof(int))>>>(
+			LocalGraphMergenceHNSW<<<num_of_points_one_batch, 32, (num_of_final_neighbors + num_of_candidates) * (sizeof(KernelPair<float, int>) + sizeof(int))>>>(
 																										d_neighbors, d_neighbors_backup, total_num_of_points, d_data, d_edge_all_blocks, i, num_of_points_one_batch, num_of_final_neighbors + num_of_candidates, 
 																										num_of_candidates, num_of_initial_neighbors, num_of_final_neighbors, d_prefix_sum_of_num_array_of_each_layer, 
 																										num_of_layers, crt_layer, d_block_recorder);

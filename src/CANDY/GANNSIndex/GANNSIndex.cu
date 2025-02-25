@@ -1,12 +1,12 @@
 //
 // Created by LIUJUN on 19/1/2025.
 //
-#include <CANDY/GANNSIndex/GANNSIndex.h>
+#include "CANDY/GANNSIndex/GANNSIndex.h"
 //#include <cuda_runtime.h>
 namespace CANDY{
 
-GANNSIndex::GANNSIndex(std::string graph_type_) {
-  graph_type = graph_type_;
+GANNSIndex::GANNSIndex() {
+  graph_type = "nsw";
 }
 
 bool GANNSIndex::setConfig(INTELLI::ConfigMapPtr cfg) {
@@ -34,7 +34,7 @@ bool GANNSIndex::setConfig(INTELLI::ConfigMapPtr cfg) {
 }
 bool GANNSIndex::loadInitialTensorWithIds(std::vector<faiss::idx_t> ids, torch::Tensor &t) {
   points = new gData(t);
-  graph = new HierarchicalNavigableSmallWorld(points);
+  graph = new NavigableSmallWorldGraphWithFixedDegree(points);
   graph->USE_L2_DIST_= USE_L2_DIST_;
   graph->USE_IP_DIST_ = USE_IP_DIST_;
   graph->USE_COS_DIST_ = USE_COS_DIST_;

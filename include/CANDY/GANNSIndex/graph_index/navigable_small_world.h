@@ -159,7 +159,9 @@ public:
         DisplaySearchParameters(num_of_topk_, num_of_explored_points);
 
         std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
-    	NSWGraphOperations::Search(points_->GetFirstPositionofPoint(0), queries, graph_, results, num_of_query_points, points_->GetNumPoints(), points_->GetDimofPoints(), offset_shift_, num_of_topk_, num_of_candidates, num_of_explored_points);
+        auto temp = NSWGraphOperations();
+    	//NSWGraphOperations::Search(points_->GetFirstPositionofPoint(0), queries, graph_, results, num_of_query_points, points_->GetNumPoints(), points_->GetDimofPoints(), offset_shift_, num_of_topk_, num_of_candidates, num_of_explored_points);
+        temp.Search(points_->GetFirstPositionofPoint(0), queries, graph_, results, num_of_query_points, points_->GetNumPoints(), points_->GetDimofPoints(), offset_shift_, num_of_topk_, num_of_candidates, num_of_explored_points);
         std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
         cout << "Query speed: " << (double)num_of_query_points/((double)std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count()/1000000) << " queries per second" << endl;
 
@@ -193,11 +195,18 @@ public:
         cudaMallocHost(&graph_, sizeof(int) * (points_->GetNumPoints() << offset_shift_));
 
         std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
-        NSWGraphOperations::LocalGraphConstructionBruteForce(points_->GetFirstPositionofPoint(0), offset_shift_, points_->GetNumPoints(), points_->GetDimofPoints(), num_of_initial_neighbors_, num_of_batches_, num_of_points_one_batch_,
-                                                                d_points, d_neighbors, d_neighbors_backup);
+        auto temp = NSWGraphOperations();
+//        NSWGraphOperations::LocalGraphConstructionBruteForce(points_->GetFirstPositionofPoint(0), offset_shift_, points_->GetNumPoints(), points_->GetDimofPoints(), num_of_initial_neighbors_, num_of_batches_, num_of_points_one_batch_,
+//                                                                d_points, d_neighbors, d_neighbors_backup);
+//
+//        NSWGraphOperations::LocalGraphMergenceCoorperativeGroup(d_points, graph_, points_->GetNumPoints(), points_->GetDimofPoints(), offset_shift_, num_of_initial_neighbors_, num_of_batches_,
+//                                                                    num_of_points_one_batch_, d_neighbors, d_neighbors_backup, num_of_maximal_neighbors_, num_of_candidates, first_subgraph);
 
-        NSWGraphOperations::LocalGraphMergenceCoorperativeGroup(d_points, graph_, points_->GetNumPoints(), points_->GetDimofPoints(), offset_shift_, num_of_initial_neighbors_, num_of_batches_, 
-                                                                    num_of_points_one_batch_, d_neighbors, d_neighbors_backup, num_of_maximal_neighbors_, num_of_candidates, first_subgraph);
+        temp.LocalGraphConstructionBruteForce(points_->GetFirstPositionofPoint(0), offset_shift_, points_->GetNumPoints(), points_->GetDimofPoints(), num_of_initial_neighbors_, num_of_batches_, num_of_points_one_batch_,
+                                                             d_points, d_neighbors, d_neighbors_backup);
+
+        temp.LocalGraphMergenceCoorperativeGroup(d_points, graph_, points_->GetNumPoints(), points_->GetDimofPoints(), offset_shift_, num_of_initial_neighbors_, num_of_batches_,
+                                                                num_of_points_one_batch_, d_neighbors, d_neighbors_backup, num_of_maximal_neighbors_, num_of_candidates, first_subgraph);
         std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
         cout << "Running time: " << (double)std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count()/1000000 << " seconds" << endl;
     }

@@ -1,7 +1,7 @@
 #pragma once
 #include <CANDY/GANNSIndex/structure_on_device.cuh>
 __global__ 
-void SortNeighborsonLocalGraph(KernelPair<float, int>* old_neighbors, int total_num_of_points, float* d_data, int num_of_points_one_batch, 
+void SortNeighborsonLocalGraphHNSW(KernelPair<float, int>* old_neighbors, int total_num_of_points, float* d_data, int num_of_points_one_batch,
                                     int num_of_initial_neighbors, int num_of_final_neighbors, KernelPair<float, int>* distance_matrix){
 
     int t_id = threadIdx.x;

@@ -3,7 +3,7 @@
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 __global__ 
-void LocalGraphMergence(KernelPair<float, int>* d_neighbors, KernelPair<float, int>* d_neighbors_backup, int total_num_of_points, 
+void LocalGraphMergenceHNSW(KernelPair<float, int>* d_neighbors, KernelPair<float, int>* d_neighbors_backup, int total_num_of_points,
                                         	float* d_data, Edge* edge_list, int batch_id, int num_of_points_one_batch, int num_of_elements_array, int num_of_candidates, 
                                             int num_of_initial_neighbors, int num_of_final_neighbors, int* prefix_sum_of_num_array_of_each_layer, int num_of_layers, 
                                             int layer_bound, unsigned long long int* block_time_recorder){

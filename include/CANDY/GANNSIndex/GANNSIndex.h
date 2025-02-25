@@ -11,7 +11,7 @@ namespace CANDY{
     extern int  USE_IP_DIST_;
     extern int  USE_COS_DIST_ ;
 }
-#include <CANDY/GANNSIndex/graph_index/hierarchical_navigable_small_world.h>
+#include <CANDY/GANNSIndex/graph_index/navigable_small_world.h>
 #include <CANDY/GANNSIndex/data.h>
 namespace CANDY{
 
@@ -22,7 +22,7 @@ public:
     std::string graph_type = "hnsw";
     gData* points;
     std::vector<faiss::idx_t> Ids;
-    GANNSIndex(std::string graph_type_);
+    GANNSIndex();
     /**
     * @brief set the index-specific config related to one index
     * @param cfg the config of this class

@@ -1,0 +1,188 @@
+//
+// Created by Isshin on 2025/2/26.
+//
+#include<CANDY/GANNSIndex/kernel_local_graph_mergence_hnsw.h>
+__global__
+void LocalGraphMergenceHNSW(KernelPair<float, int>* d_neighbors, KernelPair<float, int>* d_neighbors_backup, int total_num_of_points,
+                            float* d_data, Edge* edge_list, int batch_id, int num_of_points_one_batch, int num_of_elements_array, int num_of_candidates,
+                            int num_of_initial_neighbors, int num_of_final_neighbors, int* prefix_sum_of_num_array_of_each_layer, int num_of_layers,
+                            int layer_bound, unsigned long long int* block_time_recorder){
+    int t_id = threadIdx.x;
+    int b_id = blockIdx.x;
+    int size_of_warp = 32;
+
+    extern __shared__ KernelPair<float, int> shared_memory_space_lgm[];
+    KernelPair<float, int>* neighbors_array = shared_memory_space_lgm;
+    int* flags = (int*)(shared_memory_space_lgm + num_of_elements_array);
+
+    int crt_point_id = batch_id * num_of_points_one_batch + b_id;
+
+    if (crt_point_id >= total_num_of_points) {
+        return;
+    }
+
+    int crt_layer = num_of_layers - 1;
+    KernelPair<float, int>* crt_neighbor;
+    crt_neighbor = d_neighbors + (prefix_sum_of_num_array_of_each_layer[layer_bound] + crt_point_id) * num_of_final_neighbors;
+    KernelPair<float, int>* crt_old_neighbors = d_neighbors_backup + (crt_point_id * num_of_final_neighbors);
+
+// DECLARE_FEATURE_
+#include <CANDY/GANNSIndex/macro/declare_feature.h>
+    int step_id;
+    int substep_id;
+
+    int flag_all_blocks = 1;
+
+    int temporary_flag;
+    int first_position_of_flag = 0;
+    KernelPair<float, int> temporary_neighbor;
+    int length_of_compared_list;
+    int num_of_visited_points_one_batch = num_of_final_neighbors;
+
+    for (int i = 0; i < (num_of_candidates + num_of_visited_points_one_batch + size_of_warp - 1) / size_of_warp; i++) {
+        int unrollt_id = t_id + size_of_warp * i;
+
+        if (unrollt_id < num_of_candidates + num_of_visited_points_one_batch) {
+            flags[unrollt_id] = 0;
+
+            neighbors_array[unrollt_id].first = Max;
+            neighbors_array[unrollt_id].second = total_num_of_points;
+        }
+    }
+
+    if (t_id == 0) {
+        neighbors_array[0].second = 0;
+        flags[0] = 1;
+    }
+
+    __syncthreads();
+
+    int target_point_id = 0;
+
+// DECLARE_SECOND_FEATURE_
+#include <CANDY/GANNSIndex/macro/declare_second_feature.h>
+// COMPUTATION_
+#include <CANDY/GANNSIndex/macro/computation.h>
+// SUM_UP_
+#include <CANDY/GANNSIndex/macro/sum_up.h>
+// WITHIN_WARP_
+    dist += __shfl_down_sync(FULL_MASK, dist, 16);
+#include <CANDY/GANNSIndex/macro/within_warp.h>
+    if (t_id == 0) {
+        neighbors_array[0].first = dist;
+    }
+
+    while (flag_all_blocks) {
+
+        if (t_id == 0) {
+            flags[first_position_of_flag] = 0;
+        }
+
+        int layer_offset = prefix_sum_of_num_array_of_each_layer[crt_layer] * num_of_final_neighbors;
+        int offset_within_layer = neighbors_array[first_position_of_flag].second * num_of_final_neighbors;
+
+        length_of_compared_list = num_of_candidates;
+        if (num_of_final_neighbors < num_of_candidates) {
+            length_of_compared_list = num_of_final_neighbors;
+        }
+
+        for (int i = 0; i < (num_of_final_neighbors + size_of_warp - 1) / size_of_warp; i++) {
+            int unrollt_id = t_id + size_of_warp * i;
+
+            if (unrollt_id < num_of_final_neighbors) {
+                neighbors_array[num_of_candidates + unrollt_id] = (d_neighbors + layer_offset + offset_within_layer)[unrollt_id];
+                flags[num_of_candidates + unrollt_id] = 1;
+            }
+        }
+
+        for (int i = 0; i < num_of_final_neighbors; i++) {
+            int target_point_id = neighbors_array[num_of_candidates + i].second;
+
+            if (target_point_id >= total_num_of_points) {
+                neighbors_array[num_of_candidates + i].first = Max;
+                continue;
+            }
+
+// DECLARE_SECOND_FEATURE_
+#include <CANDY/GANNSIndex/macro/declare_second_feature.h>
+// COMPUTATION_
+#include <CANDY/GANNSIndex/macro/computation.h>
+// SUM_UP_
+#include <CANDY/GANNSIndex/macro/sum_up.h>
+// WITHIN_WARP_
+#include <CANDY/GANNSIndex/macro/within_warp.h>
+            if (t_id == 0) {
+                neighbors_array[num_of_candidates+i].first = dist;
+            }
+
+        }
+
+// BINARY_SEARCH_
+#include <CANDY/GANNSIndex/macro/binary_search.h>
+// BITONIC_SORT_ON_NEIGHBORS_
+#include <CANDY/GANNSIndex/macro/bitonic_sort_on_neighbors.h>
+// BITONIC_MERGE_
+#include <CANDY/GANNSIndex/macro/bitonic_merge.h>
+        for (int i = 0; i < (num_of_candidates + size_of_warp - 1) / size_of_warp; i++) {
+            int unrollt_id = t_id + size_of_warp * i;
+            int crt_flag = 0;
+
+            if(unrollt_id < num_of_candidates){
+                crt_flag = flags[unrollt_id];
+            }
+            first_position_of_flag = __ballot_sync(FULL_MASK, crt_flag);
+
+            if(first_position_of_flag != 0){
+                first_position_of_flag = size_of_warp * i + __ffs(first_position_of_flag) - 1;
+                break;
+            }else if(i == (num_of_candidates + size_of_warp - 1) / size_of_warp - 1){
+                if (crt_layer > layer_bound) {
+                    crt_layer--;
+                    first_position_of_flag = 0;
+
+                    for (int j = 0; j < (num_of_candidates + size_of_warp - 1) / size_of_warp; j++) {
+                        int unrollt_id2 = t_id + size_of_warp * j;
+
+                        if (unrollt_id2 < num_of_candidates && neighbors_array[unrollt_id2].first != Max) {
+                            flags[unrollt_id2] = 1;
+                        }
+                    }
+                } else {
+                    flag_all_blocks = 0;
+                }
+            }
+        }
+
+    }
+
+    for (int i = 0; i < (num_of_visited_points_one_batch + size_of_warp - 1) / size_of_warp; i++) {
+        int unrollt_id = t_id + size_of_warp * i;
+
+        if(unrollt_id < num_of_visited_points_one_batch){
+            neighbors_array[num_of_candidates + num_of_visited_points_one_batch - unrollt_id] = crt_old_neighbors[unrollt_id];
+        }
+    }
+
+// BITONIC_MERGE_
+#include <CANDY/GANNSIndex/macro/bitonic_merge.h>
+    for (int i = 0; i < (num_of_initial_neighbors + size_of_warp - 1) / size_of_warp; i++) {
+        int unrollt_id = t_id + size_of_warp * i;
+        if (unrollt_id < num_of_initial_neighbors) {
+            crt_neighbor[num_of_initial_neighbors + unrollt_id].first = Max;
+            crt_neighbor[num_of_initial_neighbors + unrollt_id].second = total_num_of_points;
+        }
+    }
+
+    for (int i = 0; i < (num_of_initial_neighbors + size_of_warp - 1) / size_of_warp; i++) {
+        int unrollt_id = t_id + size_of_warp * i;
+        KernelPair<float, int> temporary_neighbor = neighbors_array[unrollt_id];
+
+        if (unrollt_id < num_of_initial_neighbors) {
+            crt_neighbor[unrollt_id] = temporary_neighbor;
+
+            edge_list[b_id * num_of_initial_neighbors + unrollt_id].source_point = crt_point_id;
+            edge_list[b_id * num_of_initial_neighbors + unrollt_id].target_point = temporary_neighbor.second;
+            edge_list[b_id * num_of_initial_neighbors + unrollt_id].distance = temporary_neighbor.first;
+        }
+    }
+}

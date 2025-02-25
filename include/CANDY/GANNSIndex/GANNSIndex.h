@@ -12,6 +12,7 @@ namespace CANDY{
     extern int  USE_COS_DIST_ ;
 }
 #include <CANDY/GANNSIndex/graph_index/navigable_small_world.h>
+#include <CANDY/GANNSIndex/graph_index/hierarchical_navigable_small_world.h>
 #include <CANDY/GANNSIndex/data.h>
 namespace CANDY{
 

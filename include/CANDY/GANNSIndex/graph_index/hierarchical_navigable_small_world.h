@@ -216,8 +216,11 @@ public:
         DisplaySearchParameters(num_of_topk_, num_of_explored_points);
 
         std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
-    	HNSWGraphOperations::Search(points_->GetFirstPositionofPoint(0), queries, graph_, results, num_of_query_points, points_->GetNumPoints(), points_->GetDimofPoints(), 
-    		num_of_initial_neighbors_, num_of_final_neighbors, num_of_topk_, num_of_candidates, num_of_explored_points, num_of_layers_, num_of_points_on_each_layer_);
+        auto temp = HNSWGraphOperations();
+    	//HNSWGraphOperations::Search(points_->GetFirstPositionofPoint(0), queries, graph_, results, num_of_query_points, points_->GetNumPoints(), points_->GetDimofPoints(),
+    	//	num_of_initial_neighbors_, num_of_final_neighbors, num_of_topk_, num_of_candidates, num_of_explored_points, num_of_layers_, num_of_points_on_each_layer_);
+        temp.Search(points_->GetFirstPositionofPoint(0), queries, graph_, results, num_of_query_points, points_->GetNumPoints(), points_->GetDimofPoints(),
+               num_of_initial_neighbors_, num_of_final_neighbors, num_of_topk_, num_of_candidates, num_of_explored_points, num_of_layers_, num_of_points_on_each_layer_);
         std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
         std::cout << "Query speed: " << (double)num_of_query_points/((double)std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count()/1000000) << " queries per second" << endl;
     }
@@ -252,11 +255,17 @@ public:
         }
 
         std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
-        HNSWGraphOperations::LocalGraphConstructionBruteForce(points_->GetFirstPositionofPoint(0), num_of_final_neighbors, points_->GetNumPoints(), points_->GetDimofPoints(), num_of_initial_neighbors_,
-																num_of_batches_, num_of_points_one_batch_, d_points, d_neighbors_backup);
+        auto temp = HNSWGraphOperations();
+//        HNSWGraphOperations::LocalGraphConstructionBruteForce(points_->GetFirstPositionofPoint(0), num_of_final_neighbors, points_->GetNumPoints(), points_->GetDimofPoints(), num_of_initial_neighbors_,
+//																num_of_batches_, num_of_points_one_batch_, d_points, d_neighbors_backup);
+//
+//        HNSWGraphOperations::LocalGraphMergenceCoorperativeGroup(d_points, graph_, points_->GetNumPoints(), points_->GetDimofPoints(), num_of_initial_neighbors_, num_of_batches_, num_of_points_one_batch_,
+//        															d_neighbors_backup, num_of_final_neighbors, num_of_candidates, first_subgraph, num_of_layers_, num_of_points_on_each_layer_);
+        temp.LocalGraphConstructionBruteForce(points_->GetFirstPositionofPoint(0), num_of_final_neighbors, points_->GetNumPoints(), points_->GetDimofPoints(), num_of_initial_neighbors_,
+                                                              num_of_batches_, num_of_points_one_batch_, d_points, d_neighbors_backup);
 
-        HNSWGraphOperations::LocalGraphMergenceCoorperativeGroup(d_points, graph_, points_->GetNumPoints(), points_->GetDimofPoints(), num_of_initial_neighbors_, num_of_batches_, num_of_points_one_batch_, 
-        															d_neighbors_backup, num_of_final_neighbors, num_of_candidates, first_subgraph, num_of_layers_, num_of_points_on_each_layer_);
+        temp.LocalGraphMergenceCoorperativeGroup(d_points, graph_, points_->GetNumPoints(), points_->GetDimofPoints(), num_of_initial_neighbors_, num_of_batches_, num_of_points_one_batch_,
+                                                                 d_neighbors_backup, num_of_final_neighbors, num_of_candidates, first_subgraph, num_of_layers_, num_of_points_on_each_layer_);
         std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
         cout << "Running time: " << (double)std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count()/1000000 << " seconds" << endl;
 	}

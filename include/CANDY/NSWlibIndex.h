@@ -35,7 +35,11 @@ class NSWlibIndex : public AbstractIndex {
 
   virtual bool insertTensor(torch::Tensor &t);
 
+  virtual std::vector<torch::Tensor> getDataByTags(int64_t start, int64_t end);
+
   virtual std::vector<torch::Tensor> searchTensor(torch::Tensor &q, int64_t k);
+
+  virtual std::vector<faiss::idx_t> searchIndex(torch::Tensor q, int64_t k);
 };
 
 typedef std::shared_ptr<class CANDY::NSWlibIndex> NSWlibIndexPtr;

@@ -144,6 +144,13 @@ class AbstractIndex {
    * @param k the returned neighbors
    * @return std::vector<faiss::idx_t> the index, follow faiss's order
    */
+  virtual std::vector<torch::Tensor> getDataByTags(int64_t start, int64_t end);
+    /**
+   * @brief search the k-NN of a query tensor, return their index
+   * @param t the tensor, allow multiple rows
+   * @param k the returned neighbors
+   * @return std::vector<faiss::idx_t> the index, follow faiss's order
+   */
   virtual std::vector<faiss::idx_t> searchIndex(torch::Tensor q, int64_t k);
 
     /**

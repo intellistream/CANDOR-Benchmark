@@ -6,6 +6,7 @@
  */
 
 #include <CANDY/NSWlibIndex.h>
+#include <cstdlib>
 
 bool CANDY::NSWlibIndex::setConfig(INTELLI::ConfigMapPtr cfg) {
   AbstractIndex::setConfig(cfg);
@@ -66,5 +67,36 @@ std::vector<torch::Tensor> CANDY::NSWlibIndex::searchTensor(torch::Tensor &qt, i
   }
 
   return resT;
+}
+
+std::vector<faiss::idx_t> CANDY::NSWlibIndex::searchIndex(torch::Tensor qt, int64_t k) {
+  if (!index) throw std::runtime_error("NSWlibHNSW not initialized");
+
+  auto q = qt.to(torch::kCPU).contiguous();
+  if (q.dim() != 1) 
+    throw std::runtime_error("Expected a single query vector with shape (d,), got shape " +
+                              std::to_string(q.dim()));
+
+  auto res = index->searchKnn(q.data_ptr<float>(), k);
+
+  std::vector<faiss::idx_t> resIdx;
+  resIdx.reserve(k);
+
+  while (!res.empty()) {
+    resIdx.push_back(res.top().second);
+    res.pop();
+  }
+  return resIdx;
+}
+
+std::vector<torch::Tensor> CANDY::NSWlibIndex::getDataByTags(int64_t start, int64_t end) {
+  int64_t numElements = end - start;
+  std::vector<torch::Tensor > result(numElements);
+  for (int64_t i = 0; i < numElements; ++i) {
+    int64_t internalId = start + i;
+    char* data_ptr = static_cast<char*>(index->getDataByInternalId(internalId));
+    result[i] = torch::from_blob(data_ptr, {vecDim}, torch::kFloat32).clone().to(torch::kCPU);
+  }
+  return result;
 }
 

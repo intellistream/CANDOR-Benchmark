@@ -18,7 +18,7 @@
 
 using BatchIndex = size_t;
 using QueryIndex = size_t;
-using SearchRecord = std::tuple<BatchIndex, QueryIndex, torch::Tensor>;
+using SearchRecord = std::tuple<BatchIndex, QueryIndex, std::vector<faiss::idx_t>>;
 
 namespace CANDY {
 
@@ -35,6 +35,8 @@ class ConcurrentIndex : public CANDY::AbstractIndex {
   int64_t randomMode = true;
   int64_t ccQuerySize = 0;
   int64_t ANNK = 0;
+  
+  torch::Tensor ccQuery;
 
   double insertThroughput = 0.0;
   double searchThroughput = 0.0;
@@ -46,6 +48,7 @@ class ConcurrentIndex : public CANDY::AbstractIndex {
   double searchLatency95 = 0.0;
 
   std::vector<SearchRecord> searchRes;
+  std::unordered_map<int64_t, std::pair<double, double>> stepwiseRecall;
 
  public:
   ConcurrentIndex() {
@@ -67,6 +70,9 @@ class ConcurrentIndex : public CANDY::AbstractIndex {
   virtual std::map<std::string, double> ccSaveAndGetResults(std::string &outFile);
 
   virtual std::vector<torch::Tensor> searchTensor(torch::Tensor &q, int64_t k);
+
+ private:
+  virtual void calcStepwiseRecall(std::string &outFile);
 };
 
 typedef std::shared_ptr<class CANDY::ConcurrentIndex> ConcurrentIndexPtr;

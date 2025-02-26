@@ -117,6 +117,7 @@ bool CANDY::AbstractIndex::reviseTensor(torch::Tensor &t, torch::Tensor &w) {
   return false;
 }
 std::vector<faiss::idx_t> CANDY::AbstractIndex::searchIndex(torch::Tensor q, int64_t k) {
+  exit(EXIT_SUCCESS);
   assert(k > 0);
   assert(q.size(1));
   std::vector<faiss::idx_t> ru(1);
@@ -124,6 +125,11 @@ std::vector<faiss::idx_t> CANDY::AbstractIndex::searchIndex(torch::Tensor q, int
 }
 std::vector<faiss::idx_t> CANDY::AbstractIndex::searchIndexParam(torch::Tensor q, int64_t k, int64_t param){
     return searchIndex(q,k);
+}
+std::vector<torch::Tensor> CANDY::AbstractIndex::getDataByTags(int64_t start, int64_t end) {
+  torch::Tensor t = torch::empty({0}, torch::kFloat32);
+  std::vector<torch::Tensor> tv{t};
+  return tv;
 }
 
 std::vector<std::vector<std::string>> CANDY::AbstractIndex::searchStringObject(torch::Tensor &q, int64_t k) {

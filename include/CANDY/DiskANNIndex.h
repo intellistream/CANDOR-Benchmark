@@ -10,6 +10,8 @@
 
 #include "../../thirdparty/DiskANN/include/index.h"
 #include "../../thirdparty/DiskANN/include/parameters.h"
+#include "../../thirdparty/DiskANN/include/index_factory.h"
+
 #include <CANDY/AbstractIndex.h>
 
 #include <any>
@@ -21,13 +23,13 @@ class DiskANNIndex : public AbstractIndex {
   int64_t vecDim;
   int64_t maxElements;
   std::string metricType;
-  std::atomic<int64_t> count{0};
+  std::atomic<int64_t> count{1};
 
   unsigned L;               
   unsigned R;                
   float alpha;
 
-  std::unique_ptr<diskann::Index<float>> index;
+  std::unique_ptr<diskann::Index<float, uint32_t, uint32_t>> index;
 
  public:
   DiskANNIndex() = default;
@@ -37,6 +39,11 @@ class DiskANNIndex : public AbstractIndex {
   virtual bool insertTensor(torch::Tensor &t);
 
   virtual std::vector<torch::Tensor> searchTensor(torch::Tensor &q, int64_t k);
+
+  std::vector<faiss::idx_t> searchIndex(torch::Tensor qt, int64_t k);
+
+ private:
+  std::vector<torch::Tensor> getDataByTags(int64_t start, int64_t end);
 };
 
 typedef std::shared_ptr<class CANDY::DiskANNIndex> DiskANNIndexPtr;

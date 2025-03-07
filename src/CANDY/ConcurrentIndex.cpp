@@ -184,7 +184,8 @@ CANDY::ConcurrentIndex::ccSaveAndGetResults(std::string &outFile) {
       {"searchLatencyAvg", std::round(searchLatencyAvg * 10000) / 10000.0},
       {"insertLatency95", std::round(insertLatency95 * 10000) / 10000.0},
       {"searchLatency95", std::round(searchLatency95 * 10000) / 10000.0}};
-  calcStepwiseRecall(outFile);
+
+  // calcStepwiseRecall(outFile);
 
   std::cout << "Concurrent search results saved: " << searchRes.size()
             << std::endl;
@@ -256,10 +257,8 @@ void CANDY::ConcurrentIndex::calcStepwiseRecall(std::string &outFile) {
     });
   }
 
-  // 等待所有並行任務完成
   pool.waitForTasks();
 
-  // 將結果寫入文件
   std::ofstream ofs(outFile);
   if (!ofs.is_open()) {
     std::cerr << "Failed to open output file: " << outFile << std::endl;

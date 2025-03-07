@@ -50,7 +50,7 @@ bool CANDY::DiskANNIndex::insertTensor(torch::Tensor &t) {
   auto vec = t.to(torch::kCPU).contiguous();
   int64_t curCnt = count.fetch_add(1, std::memory_order_relaxed);
   if (index->insert_point(vec.data_ptr<float>(), static_cast<uint32_t>(curCnt)))
-    std::cerr << "error in inserting point " << curCnt << std::endl";
+    std::cerr << "error in inserting point " << curCnt << std::endl;
   return true;
 }
 

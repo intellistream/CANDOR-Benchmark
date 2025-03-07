@@ -179,8 +179,6 @@ bool CANDY::FaissIndex::insertTensor(torch::Tensor &t) {
     } else if (vecDim == 1369) {
       auto t_temp = torch::zeros({n, vecDim + 7});
       t_temp.slice(1, 0, vecDim) = t;
-      std::cout << "inserting" << std::endl;
-
       t_temp = t_temp.nan_to_num(0.0);
       float *new_data_padding = t_temp.contiguous().data_ptr<float>();
       index->add(n, new_data_padding);

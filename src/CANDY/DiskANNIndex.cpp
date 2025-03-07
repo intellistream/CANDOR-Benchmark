@@ -49,8 +49,7 @@ bool CANDY::DiskANNIndex::insertTensor(torch::Tensor &t) {
     throw std::runtime_error("DiskANN not initialized");
   auto vec = t.to(torch::kCPU).contiguous();
   int64_t curCnt = count.fetch_add(1, std::memory_order_relaxed);
-  if (index->insert_point(vec.data_ptr<float>(), static_cast<uint32_t>(curCnt)))
-    std::cerr << "error in inserting point " << curCnt << std::endl;
+  index->insert_point(vec.data_ptr<float>(), static_cast<uint32_t>(curCnt));
   return true;
 }
 
@@ -64,30 +63,17 @@ std::vector<torch::Tensor> CANDY::DiskANNIndex::searchTensor(torch::Tensor &qt,
   bool isBatch = (q.dim() == 2);
   int64_t rows = isBatch ? q.size(0) : 1;
   std::vector<torch::Tensor> resT(rows);
+  std::vector<uint32_t> resTags(k * rows);
+  std::vector<float *> res = std::vector<float *>();
 
   for (int64_t i = 0; i < rows; i++) {
     torch::Tensor query;
-    if (isBatch)
-      query = q.slice(0, i, i + 1).squeeze(0);
-    else
-      query = q;
-
-    std::vector<uint32_t> resIds(k);
-    std::vector<float> distances(k);
-    index->search(query.data_ptr<float>(), k, L, resIds.data(),
-                  distances.data());
-
-    torch::Tensor resultTensor = torch::zeros({k, vecDim}, torch::kFloat32);
-    for (uint32_t j = 0; j < k && j < resIds.size(); j++) {
-      uint32_t tag = resIds[j];
-      float *vec = new float[vecDim];
-      int status = index->get_vector_by_tag(tag, vec);
-      if (status == 0)
-        resultTensor.slice(0, j, j + 1) =
-            torch::from_blob(vec, {vecDim}, torch::kFloat32).clone();
-      delete[] vec;
-    }
-    resT[i] = resultTensor;
+    if (isBatch) query = q.slice(0, i, i + 1).squeeze(0);
+    else query = q;
+    index->search_with_tags(q.data_ptr<float>(), k, L, resTags.data() + i * k, nullptr, res);
+    resT[i] = torch::from_blob(res.data(), 
+                                {(int64_t)res.size(), vecDim}, 
+                                torch::TensorOptions().dtype(torch::kFloat32));
   }
 
   return resT;
@@ -101,10 +87,12 @@ std::vector<faiss::idx_t> CANDY::DiskANNIndex::searchIndex(torch::Tensor qt,
         "Expected a single query vector with shape (d,), got shape " +
         std::to_string(q.dim()));
 
-  std::vector<uint32_t> resIds(k);
-  std::vector<float> distances(k);
-  index->search(q.data_ptr<float>(), k, L, resIds.data(), distances.data());
-  std::vector<faiss::idx_t> result(resIds.begin(), resIds.end());
+  std::vector<uint32_t> resTags(k);
+  std::vector<float *> res = std::vector<float *>();
+
+  index->search_with_tags(q.data_ptr<float>(), k, L, resTags.data(), nullptr, res);
+ 
+  std::vector<faiss::idx_t> result(resTags.begin(), resTags.end());
   return result;
 }
 

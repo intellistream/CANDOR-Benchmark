@@ -15,13 +15,14 @@
 
 namespace CANDY {
 
-class NSWlibIndex : public AbstractIndex {
+class HNSWlibIndex : public AbstractIndex {
  protected:
   int64_t vecDim;
   int64_t maxElements;
   std::string metricType;
   std::atomic<int64_t> count{0};
 
+  bool isNSW;
   int64_t M;
   int64_t ef;
   std::unique_ptr<hnswlib::SpaceInterface<float>> space;
@@ -29,7 +30,7 @@ class NSWlibIndex : public AbstractIndex {
   std::unique_ptr<hnswlib::HierarchicalNSW<float>> index;
 
  public:
-  NSWlibIndex() = default;
+  HNSWlibIndex() = default;
 
   virtual bool setConfig(INTELLI::ConfigMapPtr cfg);
 
@@ -42,9 +43,9 @@ class NSWlibIndex : public AbstractIndex {
   virtual std::vector<faiss::idx_t> searchIndex(torch::Tensor q, int64_t k);
 };
 
-typedef std::shared_ptr<class CANDY::NSWlibIndex> NSWlibIndexPtr;
+typedef std::shared_ptr<class CANDY::HNSWlibIndex> HNSWlibIndexPtr;
 
-#define newNSWlibIndex std::make_shared<CANDY::NSWlibIndex>
+#define newHNSWlibIndex std::make_shared<CANDY::HNSWlibIndex>
 }
 
 #endif // CANDY_NSWLIBINDEX_H

@@ -277,10 +277,6 @@ add_subdirectory(thirdparty/hnswlib)
 include_directories(thirdparty/hnswlib/hnswlib)
 set(LIBRARIES ${LIBRARIES} hnswlib)
 
-# add_subdirectory(thirdparty/DiskANN)
-# include_directories(thirdparty/DiskANN/include)
-# set(LIBRARIES ${LIBRARIES} diskann)
-
 # Reset output directories for the rest of your project
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)

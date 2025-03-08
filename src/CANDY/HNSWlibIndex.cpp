@@ -5,10 +5,10 @@
  *  Description:
  */
 
-#include <CANDY/NSWlibIndex.h>
+#include <CANDY/HNSWlibIndex.h>
 #include <cstdlib>
 
-bool CANDY::NSWlibIndex::setConfig(INTELLI::ConfigMapPtr cfg) {
+bool CANDY::HNSWlibIndex::setConfig(INTELLI::ConfigMapPtr cfg) {
   AbstractIndex::setConfig(cfg);
   assert(cfg);
   vecDim = cfg->tryI64("vecDim", 768, true);
@@ -16,6 +16,7 @@ bool CANDY::NSWlibIndex::setConfig(INTELLI::ConfigMapPtr cfg) {
   ef = cfg->tryI64("efConstruction", 400, true);
   maxElements = cfg->tryI64("maxElements", 10000, true);
   metricType = cfg->tryString("metricType", "IP", true);
+  isNSW = cfg->tryI64("isNSW", 0, true);
   
   if (metricType == "L2") {
     space = std::make_unique<hnswlib::L2Space>(vecDim);
@@ -24,12 +25,16 @@ bool CANDY::NSWlibIndex::setConfig(INTELLI::ConfigMapPtr cfg) {
   } else {
     throw std::invalid_argument("Unsupported metric type");
   }
-  index = std::make_unique<hnswlib::HierarchicalNSW<float>>(space.get(), maxElements, M, ef);
+
+  if (isNSW)
+    index = std::make_unique<hnswlib::HierarchicalNSW<float>>(space.get(), maxElements, M, ef, 1);
+  else
+    index = std::make_unique<hnswlib::HierarchicalNSW<float>>(space.get(), maxElements, M, ef);
 
   return true;
 }
 
-bool CANDY::NSWlibIndex::insertTensor(torch::Tensor &t) {
+bool CANDY::HNSWlibIndex::insertTensor(torch::Tensor &t) {
   if (!index) throw std::runtime_error("NSWlib_HNSW not initialized");
   auto vec = t.to(torch::kCPU).contiguous();
   int64_t curCnt = count.fetch_add(1, std::memory_order_relaxed);
@@ -37,7 +42,7 @@ bool CANDY::NSWlibIndex::insertTensor(torch::Tensor &t) {
   return true;
 }
 
-std::vector<torch::Tensor> CANDY::NSWlibIndex::searchTensor(torch::Tensor &qt, int64_t k) {
+std::vector<torch::Tensor> CANDY::HNSWlibIndex::searchTensor(torch::Tensor &qt, int64_t k) {
   if (!index) throw std::runtime_error("NSWlibHNSW not initialized");
 
   auto q = qt.to(torch::kCPU).contiguous();
@@ -69,7 +74,7 @@ std::vector<torch::Tensor> CANDY::NSWlibIndex::searchTensor(torch::Tensor &qt, i
   return resT;
 }
 
-std::vector<faiss::idx_t> CANDY::NSWlibIndex::searchIndex(torch::Tensor qt, int64_t k) {
+std::vector<faiss::idx_t> CANDY::HNSWlibIndex::searchIndex(torch::Tensor qt, int64_t k) {
   if (!index) throw std::runtime_error("NSWlibHNSW not initialized");
 
   auto q = qt.to(torch::kCPU).contiguous();
@@ -89,7 +94,7 @@ std::vector<faiss::idx_t> CANDY::NSWlibIndex::searchIndex(torch::Tensor qt, int6
   return resIdx;
 }
 
-std::vector<torch::Tensor> CANDY::NSWlibIndex::getDataByTags(int64_t start, int64_t end) {
+std::vector<torch::Tensor> CANDY::HNSWlibIndex::getDataByTags(int64_t start, int64_t end) {
   int64_t numElements = end - start;
   std::vector<torch::Tensor > result(numElements);
   for (int64_t i = 0; i < numElements; ++i) {

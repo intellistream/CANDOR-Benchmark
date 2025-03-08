@@ -14,7 +14,7 @@ add_sources(
         #PQIndex.cpp
         HNSWNaiveIndex.cpp
         FaissIndex.cpp
-        NSWlibIndex.cpp
+        HNSWlibIndex.cpp
         #YinYangGraphIndex.cpp
         #YinYangGraphSimpleIndex.cpp
         CongestionDropIndex.cpp

@@ -2,10 +2,7 @@
 	path = thirdparty/hnswlib
 	url = https://github.com/intellistream/hnswlib.git
 
-[submodule "thirdparty/cufe"]
-	path = thirdparty/cufe
-	url = https://github.com/AbdelrahmanMohamed129/DiskANN
-
-[submodule "thirdparty/pyanns"]
-	path = thirdparty/pyanns
-	url = https://github.com/veaaaab/DiskANN.git
+[submodule "thirdparty/DiskANN"]
+	path = thirdparty/DiskANN
+	url = https://github.com/AbdelrahmanMohamed129/DiskANN.git
+	branch = farah

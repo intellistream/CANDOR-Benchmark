@@ -24,7 +24,7 @@ add_sources(
         LSHAPGIndex.cpp
         FlatGPUIndex.cpp
         ConcurrentIndex.cpp
-        DiskANNIndex.cpp
+        CufeIndex.cpp
 )
 add_subdirectory(HashingModels)
 add_subdirectory(ParallelPartitionIndex)

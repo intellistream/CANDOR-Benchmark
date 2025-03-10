@@ -232,36 +232,36 @@ const Variant UInt8Variant{"build_disk_uint8_index", "build_memory_uint8_index",
 const Variant Int8Variant{"build_disk_int8_index", "build_memory_int8_index", "DynamicMemoryInt8Index",
                           "StaticMemoryInt8Index", "StaticDiskInt8Index"};
 
-template <typename T> inline void add_variant(py::module_ &m, const Variant &variant)
-{
+// template <typename T> inline void add_variant(py::module_ &m, const Variant &variant)
+// {
 
 
-    m.def(variant.memory_builder_name.c_str(), &diskannpy::build_memory_index<T>, "distance_metric"_a,
-          "data_file_path"_a, "index_output_path"_a, "graph_degree"_a, "complexity"_a, "alpha"_a, "num_threads"_a,
-          "use_pq_build"_a, "num_pq_bytes"_a, "use_opq"_a, "filter_complexity"_a = 0, "use_tags"_a = false);
-    py::class_<diskannpy::DynamicMemoryIndex<T>>(m, variant.dynamic_memory_index_name.c_str())
-        .def(py::init<const diskann::AlgoType ,const diskann::Metric, const size_t, const size_t, const uint32_t, const uint32_t, const bool,
-                      const uint32_t, const float, const uint32_t, const uint32_t, const uint32_t, const uint32_t,
-                      const uint32_t, const bool>(),
-             "algo_type"_a,"distance_metric"_a, "dimensions"_a, "max_vectors"_a, "complexity"_a, "graph_degree"_a,
-             "saturate_graph"_a = diskann::defaults::SATURATE_GRAPH,
-             "max_occlusion_size"_a = diskann::defaults::MAX_OCCLUSION_SIZE, "alpha"_a = diskann::defaults::ALPHA,
-             "num_threads"_a = diskann::defaults::NUM_THREADS,
-             "filter_complexity"_a = diskann::defaults::FILTER_LIST_SIZE,
-             "num_frozen_points"_a = diskann::defaults::NUM_FROZEN_POINTS_DYNAMIC, "initial_search_complexity"_a = 0,
-             "search_threads"_a = 0, "concurrent_consolidation"_a = true)
-        .def("search", &diskannpy::DynamicMemoryIndex<T>::search, "query"_a, "knn"_a, "complexity"_a)
-        .def("load", &diskannpy::DynamicMemoryIndex<T>::load, "index_path"_a)
-        .def("batch_search", &diskannpy::DynamicMemoryIndex<T>::batch_search, "queries"_a, "num_queries"_a, "knn"_a,
-             "complexity"_a, "num_threads"_a)
-        .def("batch_insert", &diskannpy::DynamicMemoryIndex<T>::batch_insert, "vectors"_a, "ids"_a, "num_inserts"_a,
-             "num_threads"_a)
-        .def("save", &diskannpy::DynamicMemoryIndex<T>::save, "save_path"_a = "", "compact_before_save"_a = false)
-        .def("insert", &diskannpy::DynamicMemoryIndex<T>::insert, "vector"_a, "id"_a)
-        .def("mark_deleted", &diskannpy::DynamicMemoryIndex<T>::mark_deleted, "id"_a)
-        .def("consolidate_delete", &diskannpy::DynamicMemoryIndex<T>::consolidate_delete);
+//     m.def(variant.memory_builder_name.c_str(), &diskannpy::build_memory_index<T>, "distance_metric"_a,
+//           "data_file_path"_a, "index_output_path"_a, "graph_degree"_a, "complexity"_a, "alpha"_a, "num_threads"_a,
+//           "use_pq_build"_a, "num_pq_bytes"_a, "use_opq"_a, "filter_complexity"_a = 0, "use_tags"_a = false);
+//     py::class_<diskannpy::DynamicMemoryIndex<T>>(m, variant.dynamic_memory_index_name.c_str())
+//         .def(py::init<const diskann::AlgoType ,const diskann::Metric, const size_t, const size_t, const uint32_t, const uint32_t, const bool,
+//                       const uint32_t, const float, const uint32_t, const uint32_t, const uint32_t, const uint32_t,
+//                       const uint32_t, const bool>(),
+//              "algo_type"_a,"distance_metric"_a, "dimensions"_a, "max_vectors"_a, "complexity"_a, "graph_degree"_a,
+//              "saturate_graph"_a = diskann::defaults::SATURATE_GRAPH,
+//              "max_occlusion_size"_a = diskann::defaults::MAX_OCCLUSION_SIZE, "alpha"_a = diskann::defaults::ALPHA,
+//              "num_threads"_a = diskann::defaults::NUM_THREADS,
+//              "filter_complexity"_a = diskann::defaults::FILTER_LIST_SIZE,
+//              "num_frozen_points"_a = diskann::defaults::NUM_FROZEN_POINTS_DYNAMIC, "initial_search_complexity"_a = 0,
+//              "search_threads"_a = 0, "concurrent_consolidation"_a = true)
+//         .def("search", &diskannpy::DynamicMemoryIndex<T>::search, "query"_a, "knn"_a, "complexity"_a)
+//         .def("load", &diskannpy::DynamicMemoryIndex<T>::load, "index_path"_a)
+//         .def("batch_search", &diskannpy::DynamicMemoryIndex<T>::batch_search, "queries"_a, "num_queries"_a, "knn"_a,
+//              "complexity"_a, "num_threads"_a)
+//         .def("batch_insert", &diskannpy::DynamicMemoryIndex<T>::batch_insert, "vectors"_a, "ids"_a, "num_inserts"_a,
+//              "num_threads"_a)
+//         .def("save", &diskannpy::DynamicMemoryIndex<T>::save, "save_path"_a = "", "compact_before_save"_a = false)
+//         .def("insert", &diskannpy::DynamicMemoryIndex<T>::insert, "vector"_a, "id"_a)
+//         .def("mark_deleted", &diskannpy::DynamicMemoryIndex<T>::mark_deleted, "id"_a)
+//         .def("consolidate_delete", &diskannpy::DynamicMemoryIndex<T>::consolidate_delete);
 
-}
+// }
 //#endif
 #define COMPILED_TIME (__DATE__ " " __TIME__)
 PYBIND11_MODULE(PyCANDYAlgo, m) {
@@ -400,45 +400,45 @@ PYBIND11_MODULE(PyCANDYAlgo, m) {
             .def("pop", &SPSCWrapperIdx::pop);
 
 
-  auto m_diskann = m.def_submodule("diskannpy","diskann interface from microsoft.");
-  m_diskann.def("add_tensors", &add_tensors, "A function that adds two tensors");
+  // auto m_diskann = m.def_submodule("diskannpy","diskann interface from microsoft.");
+  // m_diskann.def("add_tensors", &add_tensors, "A function that adds two tensors");
 
 
-  py::module_ default_values = m_diskann.def_submodule(
-        "defaults",
-        "A collection of the default values used for common diskann operations. `GRAPH_DEGREE` and `COMPLEXITY` are not"
-        " set as defaults, but some semi-reasonable default values are selected for your convenience. We urge you to "
-        "investigate their meaning and adjust them for your use cases.");
+  // py::module_ default_values = m_diskann.def_submodule(
+  //       "defaults",
+  //       "A collection of the default values used for common diskann operations. `GRAPH_DEGREE` and `COMPLEXITY` are not"
+  //       " set as defaults, but some semi-reasonable default values are selected for your convenience. We urge you to "
+  //       "investigate their meaning and adjust them for your use cases.");
 
-  default_values.attr("ALPHA") = diskann::defaults::ALPHA;
-  default_values.attr("NUM_THREADS") = diskann::defaults::NUM_THREADS;
-  default_values.attr("MAX_OCCLUSION_SIZE") = diskann::defaults::MAX_OCCLUSION_SIZE;
-  default_values.attr("FILTER_COMPLEXITY") = diskann::defaults::FILTER_LIST_SIZE;
-  default_values.attr("NUM_FROZEN_POINTS_STATIC") = diskann::defaults::NUM_FROZEN_POINTS_STATIC;
-  default_values.attr("NUM_FROZEN_POINTS_DYNAMIC") = diskann::defaults::NUM_FROZEN_POINTS_DYNAMIC;
-  default_values.attr("SATURATE_GRAPH") = diskann::defaults::SATURATE_GRAPH;
-  default_values.attr("GRAPH_DEGREE") = diskann::defaults::MAX_DEGREE;
-  default_values.attr("COMPLEXITY") = diskann::defaults::BUILD_LIST_SIZE;
-  default_values.attr("PQ_DISK_BYTES") = (uint32_t)0;
-  default_values.attr("USE_PQ_BUILD") = false;
-  default_values.attr("NUM_PQ_BYTES") = (uint32_t)0;
-  default_values.attr("USE_OPQ") = false;
-  add_variant<float>(m_diskann, FloatVariant);
-  add_variant<uint8_t>(m_diskann, UInt8Variant);
-  add_variant<int8_t>(m_diskann, Int8Variant);
+  // default_values.attr("ALPHA") = diskann::defaults::ALPHA;
+  // default_values.attr("NUM_THREADS") = diskann::defaults::NUM_THREADS;
+  // default_values.attr("MAX_OCCLUSION_SIZE") = diskann::defaults::MAX_OCCLUSION_SIZE;
+  // default_values.attr("FILTER_COMPLEXITY") = diskann::defaults::FILTER_LIST_SIZE;
+  // default_values.attr("NUM_FROZEN_POINTS_STATIC") = diskann::defaults::NUM_FROZEN_POINTS_STATIC;
+  // default_values.attr("NUM_FROZEN_POINTS_DYNAMIC") = diskann::defaults::NUM_FROZEN_POINTS_DYNAMIC;
+  // default_values.attr("SATURATE_GRAPH") = diskann::defaults::SATURATE_GRAPH;
+  // default_values.attr("GRAPH_DEGREE") = diskann::defaults::MAX_DEGREE;
+  // default_values.attr("COMPLEXITY") = diskann::defaults::BUILD_LIST_SIZE;
+  // default_values.attr("PQ_DISK_BYTES") = (uint32_t)0;
+  // default_values.attr("USE_PQ_BUILD") = false;
+  // default_values.attr("NUM_PQ_BYTES") = (uint32_t)0;
+  // default_values.attr("USE_OPQ") = false;
+  // add_variant<float>(m_diskann, FloatVariant);
+  // add_variant<uint8_t>(m_diskann, UInt8Variant);
+  // add_variant<int8_t>(m_diskann, Int8Variant);
 
-  py::enum_<diskann::Metric>(m_diskann, "Metric")
-        .value("L2", diskann::Metric::L2)
-        .value("INNER_PRODUCT", diskann::Metric::INNER_PRODUCT)
-        .value("COSINE", diskann::Metric::COSINE)
-        .export_values();
-  py::enum_<diskann::AlgoType>(m_diskann, "AlgoType")
-        .value("DISKANN", diskann::AlgoType::DISKANN)
-        .value("CUFE", diskann::AlgoType::CUFE)
-        .value("PYANNS", diskann::AlgoType::PYANNS)
-        .export_values();
-  m_diskann.attr("defaults") = default_values;
-  m.attr("diskannpy") = m_diskann;
+  // py::enum_<diskann::Metric>(m_diskann, "Metric")
+  //       .value("L2", diskann::Metric::L2)
+  //       .value("INNER_PRODUCT", diskann::Metric::INNER_PRODUCT)
+  //       .value("COSINE", diskann::Metric::COSINE)
+  //       .export_values();
+  // py::enum_<diskann::AlgoType>(m_diskann, "AlgoType")
+  //       .value("DISKANN", diskann::AlgoType::DISKANN)
+  //       .value("CUFE", diskann::AlgoType::CUFE)
+  //       .value("PYANNS", diskann::AlgoType::PYANNS)
+  //       .export_values();
+  // m_diskann.attr("defaults") = default_values;
+  // m.attr("diskannpy") = m_diskann;
 
 
 

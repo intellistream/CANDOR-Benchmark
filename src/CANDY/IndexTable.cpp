@@ -65,7 +65,7 @@ CANDY::IndexTable::IndexTable() {
   indexMap["LSHAPG"] = newLSHAPGIndex();
   indexMap["flatGPU"] = newFlatGPUIndex();
   indexMap["Concurrent"] = newConcurrentIndex();
-  indexMap["NSWlibHNSW"] = newHNSWlibIndex();
+  indexMap["HNSWlib"] = newHNSWlibIndex();
 
 #if CANDY_CL == 1
   // indexMap["cl"] = newCLMMCPPAlgo();

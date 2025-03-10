@@ -11,20 +11,12 @@ enum Metric
     COSINE = 2,
     FAST_L2 = 3
 };
-enum AlgoType
-{
-    DISKANN = 0,
-    CUFE = 1,
-    PYANNS = 2
-};
-extern int algo_type;
+
 template <typename T> class Distance
 {
   public:
     DISKANN_DLLEXPORT Distance(diskann::Metric dist_metric) : _distance_metric(dist_metric)
     {
-        // Pyanns uses 64 byte alignment  while others use 8 byte alignment.
-        // _alignment_factor = diskann::algo_type == diskann::AlgoType::PYANNS ? 64 : 8;
     }
 
     // distance comparison function
@@ -76,7 +68,7 @@ template <typename T> class Distance
 
   protected:
     diskann::Metric _distance_metric;
-    size_t _alignment_factor = 64 ;
+    size_t _alignment_factor = 64;
 };
 
 class DistanceCosineInt8 : public Distance<int8_t>

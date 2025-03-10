@@ -28,7 +28,7 @@ typedef int FileHandle;
 #include "tsl/robin_set.h"
 #include "types.h"
 #include <any>
-#include <immintrin.h>
+
 #ifdef EXEC_ENV_OLS
 #include "content_buf.h"
 #include "memory_mapped_files.h"

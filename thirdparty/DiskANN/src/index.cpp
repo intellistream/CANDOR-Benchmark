@@ -1056,104 +1056,52 @@ std::pair<uint32_t, uint32_t> Index<T, TagT, LabelT>::iterate_to_fixed_point(
 
     while (best_L_nodes.has_unexpanded_node())
     {
-        if(diskann::algo_type != diskann::AlgoType::CUFE){
-            auto nbr = best_L_nodes.closest_unexpanded();
-            auto n = nbr.id;
+        auto nbr = best_L_nodes.closest_unexpanded();
+        auto n = nbr.id;
 
-            // Add node to expanded nodes to create pool for prune later
-            if (!search_invocation)
+        // Add node to expanded nodes to create pool for prune later
+        if (!search_invocation)
+        {
+            if (!use_filter)
             {
-                if (!use_filter)
+                expanded_nodes.emplace_back(nbr);
+            }
+            else
+            { // in filter based indexing, the same point might invoke
+                // multiple iterate_to_fixed_points, so need to be careful
+                // not to add the same item to pool multiple times.
+                if (std::find(expanded_nodes.begin(), expanded_nodes.end(), nbr) == expanded_nodes.end())
                 {
                     expanded_nodes.emplace_back(nbr);
                 }
-                else
-                { // in filter based indexing, the same point might invoke
-                    // multiple iterate_to_fixed_points, so need to be careful
-                    // not to add the same item to pool multiple times.
-                    if (std::find(expanded_nodes.begin(), expanded_nodes.end(), nbr) == expanded_nodes.end())
-                    {
-                        expanded_nodes.emplace_back(nbr);
-                    }
-                }
             }
+        }
 
-            // Find which of the nodes in des have not been visited before
-            id_scratch.clear();
-            dist_scratch.clear();
-            {
-                if (_dynamic_index)
-                    _locks[n].lock();
-                for (auto id : _final_graph[n])
-                {
-                    assert(id < _max_points + _num_frozen_pts);
-
-                    if (use_filter)
-                    {
-                        // NOTE: NEED TO CHECK IF THIS CORRECT WITH NEW LOCKS.
-                        if (!detect_common_filters(id, search_invocation, filter_label))
-                            continue;
-                    }
-
-                    if (is_not_visited(id))
-                    {
-                        id_scratch.push_back(id);
-                    }
-                }
-
-                if (_dynamic_index)
-                    _locks[n].unlock();
-            }
-        }else
+        // Find which of the nodes in des have not been visited before
+        id_scratch.clear();
+        dist_scratch.clear();
         {
-            auto beam = best_L_nodes.closest_unexpanded_beam(); // return nodes of size k
-            for (auto nbr : beam) {
-                auto n = nbr.id;
+            if (_dynamic_index)
+                _locks[n].lock();
+            for (auto id : _final_graph[n])
+            {
+                assert(id < _max_points + _num_frozen_pts);
 
-                // Add node to expanded nodes to create pool for prune later
-                if (!search_invocation)
+                if (use_filter)
                 {
-                    if (!use_filter)
-                    {
-                        expanded_nodes.emplace_back(nbr);
-                    }
-                    else
-                    { // in filter based indexing, the same point might invoke
-                        // multiple iterate_to_fixed_points, so need to be careful
-                        // not to add the same item to pool multiple times.
-                        if (std::find(expanded_nodes.begin(), expanded_nodes.end(), nbr) == expanded_nodes.end())
-                        {
-                            expanded_nodes.emplace_back(nbr);
-                        }
-                    }
+                    // NOTE: NEED TO CHECK IF THIS CORRECT WITH NEW LOCKS.
+                    if (!detect_common_filters(id, search_invocation, filter_label))
+                        continue;
                 }
-                // Find which of the nodes in des have not been visited before
-                id_scratch.clear();
-                dist_scratch.clear();
+
+                if (is_not_visited(id))
                 {
-                    if (_dynamic_index)
-                        _locks[n].lock();
-                    for (auto id : _final_graph[n])
-                    {
-                        assert(id < _max_points + _num_frozen_pts);
-
-                        if (use_filter)
-                        {
-                            // NOTE: NEED TO CHECK IF THIS CORRECT WITH NEW LOCKS.
-                            if (!detect_common_filters(id, search_invocation, filter_label))
-                                continue;
-                        }
-
-                        if (is_not_visited(id))
-                        {
-                            id_scratch.push_back(id);
-                        }
-                    }
-
-                    if (_dynamic_index)
-                        _locks[n].unlock();
+                    id_scratch.push_back(id);
                 }
             }
+
+            if (_dynamic_index)
+                _locks[n].unlock();
         }
 
         // Mark nodes visited

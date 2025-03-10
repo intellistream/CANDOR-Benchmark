@@ -22,7 +22,7 @@ template <typename data_t> class InMemDataStore : public AbstractDataStore<data_
 {
   public:
     InMemDataStore(const location_t capacity, const size_t dim, std::shared_ptr<Distance<data_t>> distance_fn);
-     ~InMemDataStore() override;
+    ~InMemDataStore() override;
 
     virtual location_t load(const std::string &filename) override;
     virtual size_t save(const std::string &filename, const location_t num_points) override;

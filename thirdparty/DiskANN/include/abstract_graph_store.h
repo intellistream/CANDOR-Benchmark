@@ -17,7 +17,9 @@ class AbstractGraphStore
     AbstractGraphStore(const size_t max_pts) : _capacity(max_pts)
     {
     }
+
     virtual ~AbstractGraphStore() = default;
+
     virtual int load(const std::string &index_path_prefix) = 0;
     virtual int store(const std::string &index_path_prefix) = 0;
 

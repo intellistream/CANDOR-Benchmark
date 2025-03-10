@@ -25,7 +25,6 @@ namespace diskann
 //
 // Base Class Implementatons
 //
-int algo_type = 0; // default to DISKANN
 template <typename T>
 float Distance<T>::compare(const T *a, const T *b, const float normA, const float normB, uint32_t length) const
 {
@@ -168,7 +167,6 @@ float DistanceL2Int8::compare(const int8_t *a, const int8_t *b, uint32_t size) c
 float DistanceL2UInt8::compare(const uint8_t *a, const uint8_t *b, uint32_t size) const
 {
     uint32_t result = 0;
-    // PyANNS uses 64-byte alignment for data while others use 8 byte alignment.
 #ifndef _WINDOWS
 #pragma omp simd reduction(+ : result) aligned(a, b : 64)
 #endif

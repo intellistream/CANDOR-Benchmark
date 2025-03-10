@@ -5,8 +5,8 @@
  *  Description:
  */
 
-#ifndef CANDY_DISKANNINDEX_H
-#define CANDY_DISKANNINDEX_H
+#ifndef CANDY_PYANNSINDEX_H
+#define CANDY_PYANNSINDEX_H
 
 #include "../../thirdparty/DiskANN/include/index.h"
 #include "../../thirdparty/DiskANN/include/parameters.h"
@@ -18,7 +18,7 @@
 
 namespace CANDY {
 
-class DiskANNIndex : public AbstractIndex {
+class PyannsIndex : public AbstractIndex {
  protected:
   int64_t vecDim;
   int64_t maxElements;
@@ -32,7 +32,7 @@ class DiskANNIndex : public AbstractIndex {
   std::unique_ptr<diskann::Index<float, uint32_t, uint32_t>> index;
 
  public:
-  DiskANNIndex() = default;
+  PyannsIndex() = default;
 
   virtual bool setConfig(INTELLI::ConfigMapPtr cfg);
 
@@ -46,10 +46,10 @@ class DiskANNIndex : public AbstractIndex {
   std::vector<torch::Tensor> getDataByTags(int64_t start, int64_t end);
 };
 
-typedef std::shared_ptr<class CANDY::DiskANNIndex> DiskANNIndexPtr;
+typedef std::shared_ptr<class CANDY::PyannsIndex> PyannsIndexPtr;
 
-#define newDiskANNIndex std::make_shared<CANDY::DiskANNIndex>
+#define newPyannsIndex std::make_shared<CANDY::PyannsIndex>
 }
 
-#endif // CANDY_DISKANNINDEX_H
+#endif // CANDY_PYANNSINDEX_H
 

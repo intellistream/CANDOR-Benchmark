@@ -34,7 +34,6 @@ diskann::Index<DT, DynamicIdType, filterT> dynamic_index_builder(const diskann::
                                                                  const uint32_t initial_search_threads,
                                                                  const bool concurrent_consolidation)
 {
-    if(diskann::algo_type == diskann::AlgoType::CUFE) diskann::cout << "Farah is in dynamic_index_builder" << std::endl;
     const uint32_t _initial_search_threads =
         initial_search_threads != 0 ? initial_search_threads : omp_get_num_threads();
     return diskann::Index<DT, DynamicIdType, filterT>(
@@ -52,7 +51,7 @@ diskann::Index<DT, DynamicIdType, filterT> dynamic_index_builder(const diskann::
 }
 
 template <class DT>
-DynamicMemoryIndex<DT>::DynamicMemoryIndex(const diskann::AlgoType algo,const diskann::Metric m, const size_t dimensions, const size_t max_vectors,
+DynamicMemoryIndex<DT>::DynamicMemoryIndex(const diskann::Metric m, const size_t dimensions, const size_t max_vectors,
                                            const uint32_t complexity, const uint32_t graph_degree,
                                            const bool saturate_graph, const uint32_t max_occlusion_size,
                                            const float alpha, const uint32_t num_threads,
@@ -65,7 +64,6 @@ DynamicMemoryIndex<DT>::DynamicMemoryIndex(const diskann::AlgoType algo,const di
       _index(dynamic_index_builder<DT>(m, _write_parameters, dimensions, max_vectors, _initial_search_complexity,
                                        initial_search_threads, concurrent_consolidation))
 {
-    diskann::algo_type = algo;
 }
 
 template <class DT> void DynamicMemoryIndex<DT>::load(const std::string &index_path)
@@ -91,7 +89,6 @@ py::array_t<int> DynamicMemoryIndex<DT>::batch_insert(
     py::array_t<DynamicIdType, py::array::c_style | py::array::forcecast> &ids, const int32_t num_inserts,
     const int num_threads)
 {
-    if(diskann::algo_type == diskann::AlgoType::CUFE)diskann::cout << "Farah is in batch_insert" << std::endl;
     if (num_threads == 0)
         omp_set_num_threads(omp_get_num_procs());
     else

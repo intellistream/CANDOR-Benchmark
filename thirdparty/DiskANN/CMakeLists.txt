@@ -323,6 +323,4 @@ include(clang-format.cmake)
 
 if(PYBIND)
     add_subdirectory(python)
-else()
-    message(STATUS "Not building python bindings")
 endif()

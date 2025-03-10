@@ -5,9 +5,9 @@
  *  Description:
  */
 
-#include <CANDY/DiskANNIndex.h>
+#include <CANDY/PyannsIndex.h>
 
-bool CANDY::DiskANNIndex::setConfig(INTELLI::ConfigMapPtr cfg) {
+bool CANDY::PyannsIndex::setConfig(INTELLI::ConfigMapPtr cfg) {
   std::cout << "setting ...  \n";
   AbstractIndex::setConfig(cfg);
   assert(cfg);
@@ -44,7 +44,7 @@ bool CANDY::DiskANNIndex::setConfig(INTELLI::ConfigMapPtr cfg) {
   return true;
 }
 
-bool CANDY::DiskANNIndex::insertTensor(torch::Tensor &t) {
+bool CANDY::PyannsIndex::insertTensor(torch::Tensor &t) {
   if (!index)
     throw std::runtime_error("DiskANN not initialized");
   auto vec = t.to(torch::kCPU).contiguous();
@@ -53,7 +53,7 @@ bool CANDY::DiskANNIndex::insertTensor(torch::Tensor &t) {
   return true;
 }
 
-std::vector<torch::Tensor> CANDY::DiskANNIndex::searchTensor(torch::Tensor &qt,
+std::vector<torch::Tensor> CANDY::PyannsIndex::searchTensor(torch::Tensor &qt,
                                                              int64_t k) {
   if (!index)
     throw std::runtime_error("DiskANN not initialized");
@@ -79,7 +79,7 @@ std::vector<torch::Tensor> CANDY::DiskANNIndex::searchTensor(torch::Tensor &qt,
   return resT;
 }
 
-std::vector<faiss::idx_t> CANDY::DiskANNIndex::searchIndex(torch::Tensor qt,
+std::vector<faiss::idx_t> CANDY::PyannsIndex::searchIndex(torch::Tensor qt,
                                                            int64_t k) {
   auto q = qt.to(torch::kCPU).contiguous();
   if (q.dim() != 1)
@@ -96,7 +96,7 @@ std::vector<faiss::idx_t> CANDY::DiskANNIndex::searchIndex(torch::Tensor qt,
   return result;
 }
 
-std::vector<torch::Tensor> CANDY::DiskANNIndex::getDataByTags(int64_t start,
+std::vector<torch::Tensor> CANDY::PyannsIndex::getDataByTags(int64_t start,
                                                               int64_t end) {
   int64_t numElements = end - start;
   std::vector<torch::Tensor> result(numElements);

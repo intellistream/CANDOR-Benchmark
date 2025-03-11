@@ -29,7 +29,7 @@ class CufeIndex : public AbstractIndex {
   unsigned R;                
   float alpha;
 
-  std::unique_ptr<diskann::Index<float, uint32_t, uint32_t>> index;
+  std::unique_ptr<diskann::AbstractIndex> index;
 
  public:
   CufeIndex() = default;

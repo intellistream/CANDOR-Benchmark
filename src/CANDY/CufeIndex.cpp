@@ -8,7 +8,6 @@
 #include <CANDY/CufeIndex.h>
 
 bool CANDY::CufeIndex::setConfig(INTELLI::ConfigMapPtr cfg) {
-  std::cout << "setting ...  \n";
   AbstractIndex::setConfig(cfg);
   assert(cfg);
   vecDim = cfg->tryI64("vecDim", 768, true);
@@ -30,18 +29,29 @@ bool CANDY::CufeIndex::setConfig(INTELLI::ConfigMapPtr cfg) {
     throw std::invalid_argument("Unsupported metric type");
   }
 
-  auto paras = std::make_shared<diskann::IndexWriteParameters>(
-      diskann::IndexWriteParametersBuilder(L, R)
-          .with_filter_list_size(0)
-          .with_alpha(alpha)
-          .with_saturate_graph(false)
-          .with_num_threads(numThreads)
-          .build());
-  
-  auto searchParas = std::make_shared<diskann::IndexSearchParams>(paras->search_list_size, paras->num_threads);
-  index = std::make_unique<diskann::Index<float, uint32_t, uint32_t>>(
-      metric, static_cast<size_t>(vecDim), static_cast<size_t>(maxElements), paras, searchParas);
+  auto paras = diskann::IndexWriteParametersBuilder(L, R)
+                                      .with_alpha(alpha)
+                                      .with_saturate_graph(false)
+                                      .with_num_threads(numThreads)
+                                      .build();
 
+  auto config = diskann::IndexConfigBuilder()
+                    .with_metric(metric)
+                    .with_dimension(vecDim)
+                    .with_max_points(maxElements)
+                    .with_data_load_store_strategy(diskann::DataStoreStrategy::MEMORY)
+                    .with_graph_load_store_strategy(diskann::GraphStoreStrategy::MEMORY)
+                    .with_data_type("float")
+                    .with_label_type("uint")
+                    .is_dynamic_index(false)
+                    .with_index_write_params(paras)
+                    .is_enable_tags(false)
+                    .is_use_opq(false)
+                    .is_pq_dist_build(false)
+                    .build();
+
+  auto index_factory = diskann::IndexFactory(config);
+  index = index_factory.create_instance();
   return true;
 }
 

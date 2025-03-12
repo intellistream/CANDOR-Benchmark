@@ -29,29 +29,32 @@ bool CANDY::CufeIndex::setConfig(INTELLI::ConfigMapPtr cfg) {
     throw std::invalid_argument("Unsupported metric type");
   }
 
-  auto paras = diskann::IndexWriteParametersBuilder(L, R)
+  auto params = diskann::IndexWriteParametersBuilder(L, R)
                                       .with_alpha(alpha)
                                       .with_saturate_graph(false)
                                       .with_num_threads(numThreads)
                                       .build();
+  auto searchParams = diskann::IndexSearchParams(params.search_list_size, params.num_threads);
+  diskann::IndexConfig config = diskann::IndexConfigBuilder()
+                                            .with_metric(diskann::L2)
+                                            .with_dimension(vecDim)
+                                            .with_max_points(maxElements)
+                                            .is_dynamic_index(true)
+                                            .with_index_write_params(params)
+                                            .with_index_search_params(searchParams)
+                                            .with_data_type(diskann_type_to_name<float>())
+                                            .with_tag_type(diskann_type_to_name<uint32_t>())
+                                            .with_label_type(diskann_type_to_name<uint32_t>())
+                                            .with_data_load_store_strategy(diskann::DataStoreStrategy::MEMORY)
+                                            .with_graph_load_store_strategy(diskann::GraphStoreStrategy::MEMORY)
+                                            .is_enable_tags(true)
+                                            .is_filtered(false)
+                                            .with_num_frozen_pts(1)
+                                            .is_concurrent_consolidate(true)
+                                            .build();
 
-  auto config = diskann::IndexConfigBuilder()
-                    .with_metric(metric)
-                    .with_dimension(vecDim)
-                    .with_max_points(maxElements)
-                    .with_data_load_store_strategy(diskann::DataStoreStrategy::MEMORY)
-                    .with_graph_load_store_strategy(diskann::GraphStoreStrategy::MEMORY)
-                    .with_data_type("float")
-                    .with_label_type("uint")
-                    .is_dynamic_index(false)
-                    .with_index_write_params(paras)
-                    .is_enable_tags(false)
-                    .is_use_opq(false)
-                    .is_pq_dist_build(false)
-                    .build();
-
-  auto index_factory = diskann::IndexFactory(config);
-  index = index_factory.create_instance();
+  diskann::IndexFactory factory = diskann::IndexFactory(config);
+  index = factory.create_instance();
   return true;
 }
 

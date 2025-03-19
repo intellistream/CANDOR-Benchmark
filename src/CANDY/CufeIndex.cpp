@@ -30,32 +30,17 @@ bool CANDY::CufeIndex::setConfig(INTELLI::ConfigMapPtr cfg) {
     throw std::invalid_argument("Unsupported metric type");
   }
 
-  auto params = diskann::IndexWriteParametersBuilder(L, R)
-                                      .with_alpha(alpha)
-                                      .with_saturate_graph(false)
-                                      .with_num_threads(numThreads)
-                                      .build();
-  auto searchParams = diskann::IndexSearchParams(params.search_list_size, params.num_threads);
-  diskann::IndexConfig config = diskann::IndexConfigBuilder()
-                                            .with_metric(diskann::L2)
-                                            .with_dimension(vecDim)
-                                            .with_max_points(maxElements)
-                                            .is_dynamic_index(true)
-                                            .with_index_write_params(params)
-                                            .with_index_search_params(searchParams)
-                                            .with_data_type(diskann_type_to_name<float>())
-                                            .with_tag_type(diskann_type_to_name<uint32_t>())
-                                            .with_label_type(diskann_type_to_name<uint32_t>())
-                                            .with_data_load_store_strategy(diskann::DataStoreStrategy::MEMORY)
-                                            .with_graph_load_store_strategy(diskann::GraphStoreStrategy::MEMORY)
-                                            .is_enable_tags(true)
-                                            .is_filtered(false)
-                                            .with_num_frozen_pts(1)
-                                            .is_concurrent_consolidate(true)
-                                            .build();
+  diskann::IndexWriteParameters paras =
+      diskann::IndexWriteParametersBuilder(L, R)
+          .with_filter_list_size(0)
+          .with_alpha(alpha)
+          .with_saturate_graph(false)
+          .with_num_threads(numThreads)
+          .build();
+  index = std::make_unique<diskann::Index<float, uint32_t, uint32_t>>(
+      metric, vecDim, maxElements, true, paras, 100, numThreads, true, true,
+      false, 0, false);
 
-  diskann::IndexFactory factory = diskann::IndexFactory(config);
-  index = factory.create_instance();
   return true;
 }
 

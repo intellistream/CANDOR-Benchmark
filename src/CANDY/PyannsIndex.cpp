@@ -5,6 +5,7 @@
  *  Description:
  */
 
+#include <thread>
 #include <CANDY/PyannsIndex.h>
 
 bool CANDY::PyannsIndex::setConfig(INTELLI::ConfigMapPtr cfg) {
@@ -19,7 +20,7 @@ bool CANDY::PyannsIndex::setConfig(INTELLI::ConfigMapPtr cfg) {
   R = cfg->tryI64("R", 32, true);
   alpha = cfg->tryDouble("alpha", 1.2f, true);
 
-  int64_t numThreads = cfg->tryI64("numThreads", 1, true);
+  int64_t numThreads = cfg->tryI64("numThreads", std::thread::hardware_concurrency(), true);
 
   diskann::Metric metric;
   if (metricType == "L2") {
